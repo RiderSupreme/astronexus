@@ -1,0 +1,7 @@
+# scratch renders and diagnostics
+_*.png
+_*.webp
+
+# python
+__pycache__/
+*.pyc
