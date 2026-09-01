@@ -628,10 +628,18 @@
     z-index: 1;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 6%;
+    /* 6% alone leaves ~21px on a 360px phone; hold a sane minimum. */
+    padding: 0 clamp(1.25rem, 6%, 4rem);
   }
 
-  section.band { padding: 14vh 0 2vh; }
+  /* Vertical only. The padding shorthand here also sets left/right to 0,
+     and being more specific than .shell it silently wiped that rule's
+     horizontal padding - invisible on desktop, where max-width keeps the
+     column off the edges anyway, but on a phone the text ran edge to edge. */
+  section.band {
+    padding-top: 14vh;
+    padding-bottom: 2vh;
+  }
 
   .band__head {
     display: flex;
@@ -936,6 +944,22 @@
   }
 
   @media (max-width: 520px) {
+    /* 34px is 9% of a phone's width - the slide reads as content flying in
+       from off-canvas rather than settling. */
+    .js [data-reveal="fadeRTL"]:not([data-reveal-split]):not([data-reveal-children]) {
+      transform: translateX(14px);
+    }
+
+    /* The date and time will not sit on one line at phone widths with the
+       full tracking, and a two-line pill reads as broken rather than
+       deliberate. */
+    .hero__status {
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      padding: 0.5rem 0.9rem;
+      white-space: nowrap;
+    }
+
     .site-header { padding: 1.2rem 6%; }
     .site-nav a { font-size: 0.6rem; letter-spacing: 0.12em; }
     .hero__foot-row { flex-direction: column; gap: 0.8rem; align-items: flex-start; }
@@ -1526,7 +1550,13 @@
         shadow.style.opacity = (1 - ease(span(p, 0.06, 0.16))).toFixed(3);
       }
 
-      window.__heroZoom = st.z;
+      // Past the pin, the scene scrolls off - the field has to go with it.
+      // Without this its opacity tracked the zoom, which stays at 1 once the
+      // hero completes, leaving bokeh sitting over every section below.
+      var exited = clamp((-rect.top - travel) / Math.max(1, pin.offsetHeight));
+      var stageVis = 1 - ease(exited);
+      window.__stageVis = stageVis;
+      window.__heroZoom = st.z * stageVis;
       window.__heroP = p;
       // The painted planet's live on-screen circle, for the globe to track.
       window.__marsScreen = { x: st.mx, y: st.my, r: st.mr };
@@ -1818,6 +1848,9 @@
       var hp = window.__heroP || 0;
       var fade = clampU((hp - 0.80) / 0.195);
       fade = fade * fade * (3 - 2 * fade);
+      // Goes with the stage, and stops the per-pixel loop running off-screen.
+      var sv = window.__stageVis;
+      if (sv !== undefined) fade *= sv;
       canvas.style.opacity = fade.toFixed(3);
       canvas.style.pointerEvents = fade > 0.8 ? 'auto' : 'none';
 
