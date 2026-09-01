@@ -225,6 +225,16 @@
   /* the ring above doubles as the focus indicator */
   .mars-marker:focus-visible { outline: none; }
 
+  /* A 26px target is fine for a cursor and too small for a fingertip. Grow
+     the hit box on touch without changing how the marker looks. */
+  @media (pointer: coarse) {
+    .mars-marker {
+      width: 46px;
+      height: 46px;
+      margin: -23px 0 0 -23px;
+    }
+  }
+
   .mars-popup {
     position: absolute;
     transform: translate(-50%, -100%);
@@ -471,6 +481,11 @@
   .stage {
     position: relative;
     height: 340vh;
+    /* Must match the pin's unit. vh is the *large* viewport height on
+       mobile, so as the address bar collapses vh grows while svh does not -
+       the travel distance would shift mid-scroll and the sequence would
+       jump. svh is stable through the chrome collapsing. */
+    height: 340svh;
   }
 
   .stage__pin {
@@ -1576,6 +1591,10 @@
     var hint = document.querySelector('.mars-globe__hint');
     if (!canvas || reduce) return;
 
+    if (hint && window.matchMedia('(hover: none)').matches) {
+      hint.textContent = 'Swipe to spin';
+    }
+
     /* -- feature tags: real coordinates, projected with the rotation.
           The texture is the standard centred-on-0-degrees map, so
           fx = ((lonE + 180) mod 360) / 360 * TW  (offset verified against
@@ -1629,8 +1648,10 @@
         e.stopPropagation();
         setPinned(pinnedIdx === i ? -1 : i);
       });
-      b.addEventListener('mouseenter', function () { hoverIdx = i; });
-      b.addEventListener('mouseleave', function () { if (hoverIdx === i) hoverIdx = -1; });
+      if (window.matchMedia('(hover: hover)').matches) {
+        b.addEventListener('mouseenter', function () { hoverIdx = i; });
+        b.addEventListener('mouseleave', function () { if (hoverIdx === i) hoverIdx = -1; });
+      }
       f.el = b;
       wrap.appendChild(b);
     });
@@ -1722,6 +1743,12 @@
       cssD = Math.min(vw, vh) * 0.66 * K;
       var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       dTot = Math.max(2, Math.round(cssD * dpr));
+      // The renderer is a per-pixel JS loop, so cost is the square of this.
+      // Phones land near 360 and are comfortable; a high-DPR tablet would
+      // otherwise ask for ~685 (470k px/frame) and drop frames. Cap the
+      // buffer and let the canvas scale it - the texture is only 1024 wide,
+      // so there is little real detail lost.
+      if (dTot > 460) dTot = 460;
       var r = dTot / 2;
       canvas.width = dTot; canvas.height = dTot;
       canvas.style.width = cssD.toFixed(1) + 'px';
