@@ -43,6 +43,7 @@
     --bg-elevated: #14100b;
     --text: #f4ede0;
     --text-dim: #9a8f7a;
+    --text-mid: #bcb19c;
     --accent: #e4b46c;
     --accent-soft: #e4b46c30;
     --accent-hot: #f0e4a8;
@@ -648,11 +649,6 @@
     margin-bottom: 2.6rem;
   }
 
-  .band__num {
-    color: var(--accent);
-    flex: none;
-  }
-
   .band__title {
     font-size: clamp(2rem, 5vw, 3.2rem);
     margin: 0;
@@ -762,7 +758,11 @@
 
   .event__grade {
     margin-left: auto;
-    color: var(--text-dim);
+    /* Overrides .mono: at 0.7rem with 0.2em tracking this line was the
+       hardest thing on the page to read. */
+    font-size: 0.78rem;
+    letter-spacing: 0.13em;
+    color: var(--text-mid);
     transition: color 0.35s ease;
   }
 
@@ -788,9 +788,9 @@
 
   .event__desc {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
-    font-size: 0.8rem;
-    line-height: 1.85;
-    color: var(--text-dim);
+    font-size: 0.875rem;
+    line-height: 1.8;
+    color: var(--text-mid);
     margin: 0;
     max-width: 46ch;
   }
@@ -1055,7 +1055,6 @@
 
   <section class="band shell" id="about">
     <div class="band__head">
-      <span class="band__num mono" data-reveal="fadeUp">01.</span>
       <h2 class="band__title display" data-reveal="fadeUp" data-reveal-split="words">What is AstroNexus</h2>
     </div>
 
@@ -1073,7 +1072,6 @@
     <div class="events__grid">
       <div class="events__title-col">
         <div class="band__head">
-          <span class="band__num mono" data-reveal="fadeUp">02.</span>
           <h2 class="band__title display" data-reveal="fadeUp" data-reveal-split="words">The Challenges</h2>
         </div>
         <p class="events__note mono" data-reveal="fadeUp">Ordered by year group. Each challenge runs in parallel on the day.</p>

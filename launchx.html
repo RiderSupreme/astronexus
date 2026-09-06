@@ -99,6 +99,36 @@
     text-decoration: none;
   }
 
+  /* Sits under the logo. The logo goes home to the top of the landing page;
+     this returns the visitor to wherever they actually came from. */
+  .goback {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0.9rem 6% 0;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.3s ease;
+  }
+
+  .goback__arrow {
+    display: inline-block;
+    transition: transform 0.4s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+
+  .goback:hover,
+  .goback:focus-visible { color: var(--accent); }
+
+  .goback:hover .goback__arrow,
+  .goback:focus-visible .goback__arrow { transform: translateX(-4px); }
+
 
 
   .page {
@@ -463,6 +493,7 @@
       transition: none !important;
     }
     .backlink::before { transition: none; }
+    .goback__arrow { transition: none; }
   }
 
 </style>
@@ -473,6 +504,28 @@
 <canvas id="stars" aria-hidden="true"></canvas>
 
 <a class="backlink logo-mark" href="index.html"><span class="sr-only">NMS AstroNexus — back to home</span></a>
+<a class="goback" href="index.html#events"><span class="goback__arrow" aria-hidden="true">&larr;</span>Back</a>
+
+<script>
+/* Prefer real history so "Back" returns to the exact spot the visitor left,
+   scroll position and all. Falls back to the href when this page was opened
+   cold (deep link, new tab, bookmark), where history.back() would either do
+   nothing or leave the site. */
+(function () {
+  var link = document.querySelector('.goback');
+  if (!link) return;
+  link.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var ref = document.referrer;
+    if (!ref || history.length < 2) return;
+    try {
+      if (new URL(ref).origin !== location.origin) return;
+    } catch (err) { return; }
+    e.preventDefault();
+    history.back();
+  });
+})();
+</script>
 
 <main class="page">
 
