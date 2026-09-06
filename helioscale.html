@@ -221,6 +221,16 @@
     margin: 0 0 0.5rem;
   }
 
+  /* Qualifies a stat value without competing with it for weight. */
+  .stat-note {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    line-height: 1.6;
+    color: var(--text-dim);
+    margin: 0.4rem 0 0;
+    max-width: 22ch;
+  }
+
   .stat-value {
     font-family: 'Fraunces', Georgia, serif;
     font-size: 1.5rem;
@@ -556,6 +566,7 @@
     <div class="stat">
       <p class="stat-label">Software</p>
       <p class="stat-value">AstroImageJ</p>
+      <p class="stat-note">Pre-installed on devices we provide.</p>
     </div>
   </div>
 
