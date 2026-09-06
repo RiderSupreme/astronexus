@@ -766,6 +766,12 @@
     transition: color 0.35s ease;
   }
 
+  /* Kept a shade back so the year group still reads first. */
+  .event__grade-eq {
+    color: var(--text-dim);
+    transition: color 0.35s ease;
+  }
+
   .event__name {
     font-family: 'Fraunces', Georgia, serif;
     font-weight: 400;
@@ -827,7 +833,9 @@
   }
 
   .event:hover .event__grade,
-  .event:focus-visible .event__grade { color: var(--accent); }
+  .event:focus-visible .event__grade,
+  .event:hover .event__grade-eq,
+  .event:focus-visible .event__grade-eq { color: var(--accent); }
 
   /* ---- footer ---------------------------------------------------------- */
 
@@ -1045,7 +1053,7 @@
     <div class="hero__foot" data-reveal="fadeUp" data-reveal-delay="0.5">
       <div class="rule"></div>
       <div class="hero__foot-row mono">
-        <span>Grades 6 &ndash; 12 &middot; Four Challenges</span>
+        <span>Grades 6 &ndash; 12 or equivalent &middot; Four Challenges</span>
         <a class="hero__cue" href="#about" data-scroll>Explore <span class="arrow">&darr;</span></a>
       </div>
     </div>
@@ -1062,7 +1070,7 @@
       <p class="about__lead" data-reveal="fadeUp" data-reveal-split="lines">Four challenges, one afternoon, and a school field turned into mission control.</p>
 
       <div class="about__prose">
-        <p data-reveal="fadeRTL">AstroNexus is the first student-led space event of its kind in the UAE. Hosted by the <strong>Al Amal Space Club</strong> and the <strong>Physics Department</strong> at <strong>GEMS New Millennium School</strong>, it brings students from Grade 6 through Grade 12 into four parallel challenges &mdash; from decoding satellite telemetry to measuring sunspots against the size of Earth.</p>
+        <p data-reveal="fadeRTL">AstroNexus is the first student-led space event of its kind in the UAE. Hosted by the <strong>Al Amal Space Club</strong> and the <strong>Physics Department</strong> at <strong>GEMS New Millennium School</strong>, it brings students from Grade 6 through Grade 12 &mdash; or the equivalent year in other curricula &mdash; into four parallel challenges &mdash; from decoding satellite telemetry to measuring sunspots against the size of Earth.</p>
         <p data-reveal="fadeRTL" data-reveal-delay="0.1">Each sub-event is pitched at a different age group and a different discipline: optics, rocketry, orbital mechanics, and solar research. Every one of them ends the same way &mdash; a team standing in front of judges, explaining what they built and why it works.</p>
       </div>
     </div>
@@ -1082,7 +1090,7 @@
           <a class="event" href="lostinorbit.html">
             <div class="event__top mono">
               <span class="event__num">01</span>
-              <span class="event__grade">Grade 6</span>
+              <span class="event__grade">Grade 6 <span class="event__grade-eq">or equivalent</span></span>
             </div>
             <h3 class="event__name">LostInOrbit <span class="arrow">&rarr;</span></h3>
             <p class="event__desc">Orbital crisis &amp; satellite rescue. Decode telemetry, build debris shielding, and re-route severed power grids from mission control.</p>
@@ -1093,7 +1101,7 @@
           <a class="event" href="terrafab.html">
             <div class="event__top mono">
               <span class="event__num">02</span>
-              <span class="event__grade">Grade 7&ndash;8</span>
+              <span class="event__grade">Grade 7&ndash;8 <span class="event__grade-eq">or equivalent</span></span>
             </div>
             <h3 class="event__name">TerraFab <span class="arrow">&rarr;</span></h3>
             <p class="event__desc">Light-routing optics &amp; interference. Steer laser beams around obstacles with front-surface mirrors and hit the target sensors clean.</p>
@@ -1104,7 +1112,7 @@
           <a class="event" href="launchx.html">
             <div class="event__top mono">
               <span class="event__num">03</span>
-              <span class="event__grade">Grade 9&ndash;10</span>
+              <span class="event__grade">Grade 9&ndash;10 <span class="event__grade-eq">or equivalent</span></span>
             </div>
             <h3 class="event__name">LaunchX <span class="arrow">&rarr;</span></h3>
             <p class="event__desc">Rocketry design challenge. Design and build a model rocket with a randomly assigned partner, then fly it from the school field.</p>
@@ -1115,7 +1123,7 @@
           <a class="event" href="helioscale.html">
             <div class="event__top mono">
               <span class="event__num">04</span>
-              <span class="event__grade">Grade 11&ndash;12</span>
+              <span class="event__grade">Grade 11&ndash;12 <span class="event__grade-eq">or equivalent</span></span>
             </div>
             <h3 class="event__name">HelioScale <span class="arrow">&rarr;</span></h3>
             <p class="event__desc">Solar data analysis. Measure real sunspots in AstroImageJ, trace CME source regions, and scale them against the size of Earth.</p>
