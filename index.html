@@ -837,6 +837,59 @@
   .event:hover .event__grade-eq,
   .event:focus-visible .event__grade-eq { color: var(--accent); }
 
+  /* ---- organizers ------------------------------------------------------ */
+
+  .organizers__grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 2.6rem 2rem;
+  }
+
+  .organizer {
+    margin: 0;
+  }
+
+  /* Placeholder until real portraits land: the initials come from the
+     data-initials attribute, so supplying a photo means setting --photo and
+     deleting that attribute - no CSS change, no extra class. */
+  .organizer__photo {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 14px;
+    border: 1px solid var(--line-strong);
+    background: var(--photo, linear-gradient(155deg, #1c150d, var(--bg-elevated))) center / cover no-repeat;
+    overflow: hidden;
+  }
+
+  .organizer__photo::after {
+    content: attr(data-initials);
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: clamp(1.7rem, 4vw, 2.4rem);
+    letter-spacing: 0.05em;
+    color: var(--accent);
+    opacity: 0.5;
+  }
+
+  .organizer__name {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(1.15rem, 2.2vw, 1.4rem);
+    line-height: 1.2;
+    margin: 1.1rem 0 0.4rem;
+  }
+
+  .organizer__role {
+    color: var(--text-mid);
+    margin: 0;
+  }
+
   /* ---- footer ---------------------------------------------------------- */
 
   .site-footer {
@@ -971,6 +1024,19 @@
     .site-header { padding: 1.2rem 6%; }
     .site-nav a { font-size: 0.6rem; letter-spacing: 0.12em; }
     .hero__foot-row { flex-direction: column; gap: 0.8rem; align-items: flex-start; }
+
+    /* Full-width portraits stack into a ~1300px scroll for three people.
+       Reading them as a list keeps each one to a single glance. */
+    .organizers__grid { gap: 1.5rem; }
+
+    .organizer {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr);
+      gap: 1.1rem;
+      align-items: center;
+    }
+
+    .organizer__name { margin: 0 0 0.3rem; }
   }
 
   /* ---- motion ---------------------------------------------------------- */
@@ -1016,6 +1082,7 @@
   <nav class="site-nav" aria-label="Sections">
     <a class="wipe" href="#about" data-scroll>About</a>
     <a class="wipe" href="#events" data-scroll>Events</a>
+    <a class="wipe" href="#organizers" data-scroll>Organizers</a>
   </nav>
 </header>
 
@@ -1132,6 +1199,42 @@
         </li>
       </ol>
     </div>
+  </section>
+
+  <section class="band shell" id="organizers">
+    <div class="band__head">
+      <h2 class="band__title display" data-reveal="fadeUp" data-reveal-split="words">Organizers</h2>
+    </div>
+
+    <ul class="organizers__grid" data-reveal="fadeUp" data-reveal-children data-reveal-stagger="0.1">
+      <li>
+        <figure class="organizer">
+          <div class="organizer__photo" data-initials="SJ" role="img" aria-label="Sriram Jagannath"></div>
+          <figcaption>
+            <h3 class="organizer__name">Sriram Jagannath</h3>
+            <p class="organizer__role mono">Founder &amp; Chief Organizer</p>
+          </figcaption>
+        </figure>
+      </li>
+      <li>
+        <figure class="organizer">
+          <div class="organizer__photo" data-initials="KG" role="img" aria-label="Kavin Grover"></div>
+          <figcaption>
+            <h3 class="organizer__name">Kavin Grover</h3>
+            <p class="organizer__role mono">Co-Founder &amp; Co-Organizer</p>
+          </figcaption>
+        </figure>
+      </li>
+      <li>
+        <figure class="organizer">
+          <div class="organizer__photo" data-initials="PB" role="img" aria-label="Parnika Bhatnagar"></div>
+          <figcaption>
+            <h3 class="organizer__name">Parnika Bhatnagar</h3>
+            <p class="organizer__role mono">Co-Founder &amp; Co-Organizer</p>
+          </figcaption>
+        </figure>
+      </li>
+    </ul>
   </section>
 
 </main>
