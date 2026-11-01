@@ -507,7 +507,7 @@ if (firebaseConfig.apiKey) {
   let userCb;
   api = {
     demo: true,
-    onUser: cb => { userCb = cb; let u = null; try { u = sessionStorage.getItem('anx-user'); } catch {} cb(u); },
+    onUser: cb => { userCb = cb; let u = null; try { u = sessionStorage.getItem('anx-user'); } catch {} setTimeout(() => cb(u)); },  // async like Firebase, so the whole script has loaded first
     login: async (id, pw) => { const L = read().logins || {}; if (!(ROLES.includes(id) && pw.trim().toLowerCase() === 'demo') && !(L[id] && L[id] === pw)) throw new Error('auth/invalid-credential'); try { sessionStorage.setItem('anx-user', id); } catch {} userCb(id); },
     logout: async () => { try { sessionStorage.removeItem('anx-user'); } catch {} userCb(null); },
     anon: async () => {},
