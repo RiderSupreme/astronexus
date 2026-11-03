@@ -11,22 +11,22 @@ The portal is one file, `starbase.html`, and runs on any static website. Scores 
 
 ## 2. Create the 17 logins
 Go to **Authentication > Users > Add user**. The email is the login ID plus `@starbase.astronexus26.app` (no emails are sent there).
-The passwords are in **Starbase Nexus Logins.pdf** (kept outside this folder, do not upload it). Each group shares one login.
+The passwords are in **Starbase Nexus Logins.pdf** (kept outside this folder, do not upload it). Each group shares one login. Judges 1-2 score HelioScale, 3-4 LaunchX, 5-6 TerraFab, 7-8 Lost in Orbit.
 
 | Login ID | Who uses it | What they see and do |
 |---|---|---|
-| `hs-judge-1` | Judge 1 · HelioScale | Scores HelioScale teams (only their own scores) |
-| `hs-judge-2` | Judge 2 · HelioScale | Scores HelioScale teams (only their own scores) |
-| `lx-judge-1` | Judge 1 · LaunchX | Scores LaunchX teams (only their own scores) |
-| `lx-judge-2` | Judge 2 · LaunchX | Scores LaunchX teams (only their own scores) |
-| `tf-judge-1` | Judge 1 · TerraFab | Scores TerraFab teams (only their own scores) |
-| `tf-judge-2` | Judge 2 · TerraFab | Scores TerraFab teams (only their own scores) |
-| `lio-judge-1` | Judge 1 · Lost in Orbit | Scores Lost in Orbit teams (only their own scores) |
-| `lio-judge-2` | Judge 2 · Lost in Orbit | Scores Lost in Orbit teams (only their own scores) |
-| `hs-head` | HelioScale event heads | HelioScale attendance (can mark), live venue map |
-| `lx-head` | LaunchX event heads | LaunchX attendance (can mark), live venue map |
-| `tf-head` | TerraFab event head | TerraFab attendance (can mark), live venue map |
-| `lio-head` | Lost in Orbit event heads | Lost in Orbit attendance (can mark), live venue map |
+| `judge1` | Judge 1 · HelioScale | Scores HelioScale teams (only their own scores) |
+| `judge2` | Judge 2 · HelioScale | Scores HelioScale teams (only their own scores) |
+| `judge3` | Judge 3 · LaunchX | Scores LaunchX teams (only their own scores) |
+| `judge4` | Judge 4 · LaunchX | Scores LaunchX teams (only their own scores) |
+| `judge5` | Judge 5 · TerraFab | Scores TerraFab teams (only their own scores) |
+| `judge6` | Judge 6 · TerraFab | Scores TerraFab teams (only their own scores) |
+| `judge7` | Judge 7 · Lost in Orbit | Scores Lost in Orbit teams (only their own scores) |
+| `judge8` | Judge 8 · Lost in Orbit | Scores Lost in Orbit teams (only their own scores) |
+| `helioscale` | HelioScale event head | HelioScale attendance (can mark), live venue map |
+| `launchx` | LaunchX event head | LaunchX attendance (can mark), live venue map |
+| `terrafab` | TerraFab event head | TerraFab attendance (can mark), live venue map |
+| `lostinorbit` | Lost in Orbit event head | Lost in Orbit attendance (can mark), live venue map |
 | `logistics` | Team Logistics | All four events' attendance and team check-ins (can mark) |
 | `volunteers` | Registration desk and volunteers | Roll call: present / absent for every student, fix names |
 | `results` | Certificate writers / results room | Live scores, podiums, certificate list of present students |
@@ -46,7 +46,7 @@ Event heads can only mark students in their own event; the database rules enforc
 - Then clear the test data: **Firestore > Data**, delete the `scores`, `status`, `certs`, `checkins` and `attendance` collections. Keep `pins`.
 
 ## On the day
-- **Judges (2 per event):** each judge signs in with their own ID (e.g. `hs-judge-1`) and taps one level per criterion. No judge names or photos are shown. Scores save automatically, even if the connection drops, and sync when it's back. When finished, press **Submit final scores**, which locks that judge's scores.
+- **Judges (2 per event):** each judge signs in with their own ID (e.g. `judge1`) and taps one level per criterion. No judge names or photos are shown. Scores save automatically, even if the connection drops, and sync when it's back. When finished, press **Submit final scores**, which locks that judge's scores.
 - **Rubrics in the tool:** HelioScale 3 criteria (out of 90) · LaunchX 4 criteria: Altitude, Range, Structural Integrity, Teamwork & Launch Safety (out of 120) · TerraFab 3 criteria with 0/10/20/30 ticks plus Critics' Choice 0–10 (out of 100) · Lost in Orbit 3 criteria (out of 90).
 - **Results room:** sign in as `results`. Each event shows Judge 1, Judge 2 and the **average**, which decides the ranking and the 1st/2nd/3rd podium. An event shows **FINAL** once both judges have submitted; write the certificates then and tick **Certificates written**.
 - **Rolling Trophy:** events have different totals, so each school's best team score per event is turned into a percentage and the four are added (out of 400).
@@ -58,7 +58,7 @@ Sign in as `admin` and open **Staff logins**. Type a login ID (lower case, e.g. 
 - Roles: Volunteers (registration roll call), Event heads (pick the event), Team Logistics (all events), Certificates & results, Core team & teachers (view only).
 - The password is shown only once: write it down or send it privately.
 - **Turn off** removes that login's access immediately (the database rules check it on every request).
-- Judges keep their 8 fixed logins (`hs-judge-1` … `lio-judge-2`); school teams keep their Team ID + PIN.
+- Judges keep their 8 fixed logins (`judge1` … `judge8`); school teams keep their Team ID + PIN.
 
 ## Paper sheets: judges and attendance (photo upload)
 Print **Judge Score Sheets (bubble).pdf** (one page per judge, 8 pages, landscape) and **Attendance Sheets (bubble).pdf** (6 pages: HelioScale 2, LaunchX 2, TerraFab 1, Lost in Orbit 1). Print at **100% / Actual size**, single-sided, and do not resize.

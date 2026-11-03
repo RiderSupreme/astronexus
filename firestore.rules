@@ -4,9 +4,9 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null && request.auth.token.email.matches('.*@starbase[.]astronexus26[.]app'); }
     function me() { return request.auth.token.email.split('@')[0]; }
-    // 8 judges, 2 per event: hs-judge-1, hs-judge-2, lx-judge-1 ... lio-judge-2
-    function JEV() { return {'hs-judge-1': 'helioscale', 'hs-judge-2': 'helioscale', 'lx-judge-1': 'launchx', 'lx-judge-2': 'launchx',
-                             'tf-judge-1': 'terrafab', 'tf-judge-2': 'terrafab', 'lio-judge-1': 'lostinorbit', 'lio-judge-2': 'lostinorbit'}; }
+    // 8 judges, 2 per event: judge1-2 HelioScale, judge3-4 LaunchX, judge5-6 TerraFab, judge7-8 Lost in Orbit
+    function JEV() { return {'judge1': 'helioscale', 'judge2': 'helioscale', 'judge3': 'launchx', 'judge4': 'launchx',
+                             'judge5': 'terrafab', 'judge6': 'terrafab', 'judge7': 'lostinorbit', 'judge8': 'lostinorbit'}; }
     function judge() { return signedIn() && me() in JEV(); }
     function myEv() { return JEV()[me()]; }
     // logins created in the Staff logins tab: accounts/<login id> = { role, ev, disabled }
@@ -14,9 +14,9 @@ service cloud.firestore {
     function hasAcct() { return signedIn() && exists(/databases/$(database)/documents/accounts/$(me())) && acct().get('disabled', false) != true; }
     function arole() { return hasAcct() ? acct().role : ''; }
     function staff() { return signedIn() && (me() in ['results', 'admin'] || arole() == 'results'); }
-    function heads() { return signedIn() && (me() in ['hs-head', 'lx-head', 'tf-head', 'lio-head', 'logistics'] || arole() in ['head', 'logistics']); }
+    function heads() { return signedIn() && (me() in ['helioscale', 'launchx', 'terrafab', 'lostinorbit', 'logistics'] || arole() in ['head', 'logistics']); }
     // event heads may mark only their own event; logistics may mark any
-    function headFor(ev) { return heads() && (me() == 'logistics' || arole() == 'logistics' || {'hs-head': 'helioscale', 'lx-head': 'launchx', 'tf-head': 'terrafab', 'lio-head': 'lostinorbit'}.get(me(), '') == ev
+    function headFor(ev) { return heads() && (me() == 'logistics' || arole() == 'logistics' || {'helioscale': 'helioscale', 'launchx': 'launchx', 'terrafab': 'terrafab', 'lostinorbit': 'lostinorbit'}.get(me(), '') == ev
                                           || (arole() == 'head' && acct().ev == ev)); }
     function core() { return signedIn() && (me() == 'core' || arole() == 'core'); }
     function admin() { return signedIn() && me() == 'admin'; }
@@ -28,7 +28,7 @@ service cloud.firestore {
     function okScore(v) { return v == null || (v is int && v >= 0 && v <= 30); }
 
     function c(k) { return request.resource.data.get(k, null); }
-    // One document per judge per team: <judge id>_<team no>, e.g. hs-judge-1_HS-03. Levels 0-30; TerraFab c4 (Critics' Choice) 0-10
+    // One document per judge per team: <judge id>_<team no>, e.g. judge1_HS-03. Levels 0-30; TerraFab c4 (Critics' Choice) 0-10
     match /scores/{id} {
       allow read: if staff() || (judge() && resource.data.judge == me());
       allow create, update: if judge()
