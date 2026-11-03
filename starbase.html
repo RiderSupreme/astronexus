@@ -378,7 +378,12 @@ const ROLE = {
   'lostinorbit': { kind: 'head', ev: 'lostinorbit', grp: 'Event heads', label: 'Lost in Orbit head' },
   logistics:   { kind: 'head', grp: 'Teams', label: 'Team Logistics' },
   volunteers:  { kind: 'desk', grp: 'Teams', label: 'Volunteers · registration' },
-  results:     { kind: 'results', grp: 'Teams', label: 'Certificates & results' },
+  results1:    { kind: 'results', grp: 'Results room', label: 'Results room 1' },
+  results2:    { kind: 'results', grp: 'Results room', label: 'Results room 2' },
+  coordinator1: { kind: 'certs', grp: 'Event coordinators', label: 'Coordinator 1 · certificates' },
+  coordinator2: { kind: 'certs', grp: 'Event coordinators', label: 'Coordinator 2 · certificates' },
+  coordinator3: { kind: 'certs', grp: 'Event coordinators', label: 'Coordinator 3 · certificates' },
+  coordinator4: { kind: 'certs', grp: 'Event coordinators', label: 'Coordinator 4 · certificates' },
   core:        { kind: 'core', grp: 'Teams', label: 'Core team & teachers' },
   admin:       { kind: 'admin', grp: 'Teams', label: 'Admin (Sriram)' },
 };
@@ -590,17 +595,17 @@ api.onUser(user => {
   }
   route(user, ROLE[user]);
 });
-const ACCT_ROLES = { volunteers: 'Volunteers · registration roll call', head: 'Event heads (one event)', logistics: 'Team Logistics (all events)', results: 'Certificates & results', core: 'Core team & teachers (view only)' };
+const ACCT_ROLES = { volunteers: 'Volunteers · registration roll call', head: 'Event heads (one event)', logistics: 'Team Logistics (all events)', results: 'Results room', coordinator: 'Event coordinators (certificates)', core: 'Core team & teachers (view only)' };
 function acctRole(a) {
   if (!a || a.disabled || !ACCT_ROLES[a.role]) return null;
   const lab = a.label || ACCT_ROLES[a.role];
   return a.role === 'volunteers' ? { kind: 'desk', label: lab } : a.role === 'head' ? { kind: 'head', ev: a.ev, label: lab } : a.role === 'logistics' ? { kind: 'head', label: lab }
-    : a.role === 'results' ? { kind: 'results', label: lab } : { kind: 'core', label: lab };
+    : a.role === 'results' ? { kind: 'results', label: lab } : a.role === 'coordinator' ? { kind: 'certs', label: lab } : { kind: 'core', label: lab };
 }
 function route(user, R) {
   window.anxFX && anxFX(R.kind === 'judge' ? .5 : 1);
   if (R.kind === 'judge') judgeView(EV[R.ev], user, R);
-  else if (R.kind === 'results' || R.kind === 'admin') resultsView(R.kind === 'admin');
+  else if (R.kind === 'results' || R.kind === 'admin' || R.kind === 'certs') resultsView(R.kind === 'admin', R.kind === 'certs');
   else if (R.kind === 'head') checkinView(R.ev, R.label);
   else if (R.kind === 'desk') deskView();
   else if (R.kind === 'core') coreView();
@@ -1040,7 +1045,7 @@ function accPane() {
     return `${w[r(w.length)]}-${w[r(w.length)]}-${1000 + r(9000)}`; };
   const draw = () => {
     host.innerHTML = `<div class="banner" style="border-color:var(--line)">Create a login for anyone who needs starbase.nexus. A login can be used on many devices at the same time, so a whole team can share one.
-      The 17 ready-made logins (judges, event heads, logistics, volunteers, results, core, admin) keep working as they are.</div>
+      The 22 ready-made logins (judges, event heads, logistics, volunteers, results room, coordinators, core, admin) keep working as they are.</div>
       <form id="accForm" class="prof" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end">
         <label>Login ID<br><input id="aId" required pattern="[a-z0-9-]{3,30}" placeholder="e.g. vol-reception" style="width:100%;padding:9px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text)"></label>
         <label>Password<br><span style="display:flex;gap:6px"><input id="aPw" required minlength="8" style="flex:1;min-width:0;padding:9px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text)"><button type="button" class="btn small" id="aGen">New</button></span></label>
@@ -1071,26 +1076,28 @@ function accPane() {
   unsub.push(() => accPane.u && accPane.u());
 }
 
-function resultsView(isAdmin) {
-  $('#whoName').textContent = isAdmin ? 'Admin' : 'Results Room'; $('#whoRole').textContent = 'Live scores · certificate writing';
+// certsOnly: event coordinators. They see places, podiums and the certificate list for
+// every event, but not the judges' scores, averages or notes.
+function resultsView(isAdmin, certsOnly) {
+  $('#whoName').textContent = isAdmin ? 'Admin' : certsOnly ? 'Event coordinator' : 'Results Room'; $('#whoRole').textContent = certsOnly ? 'Places · certificate writing' : 'Live scores · certificate writing';
   let tab = DATA.events[0].id, scores = [], status = [], certs = [], editingJ = null, cks = [], pinsOpen = false, A = {};
   const rowsOf = E => E.teams.map(t => ({ ...t, ...teamScore(E.id, t.no, scores) }));
   const render = () => { if (editingJ || (tab === 'pins' && document.querySelector('.slips')) || (tab === 'acc' && document.querySelector('#accForm'))) return;
     const byEv = id => scores.filter(s => s.event === id), fin = id => evFinal(id, status);
     $('#main').innerHTML = `
-      <div class="hero"><div><p class="mono" style="color:var(--sand);font-size:11px;margin:0 0 4px">Results room · live</p><h2>Scores &amp; Winners</h2>
-        <p>Updates live as judges enter scores. Write winners' certificates once an event shows FINAL.</p></div>
+      <div class="hero"><div><p class="mono" style="color:var(--sand);font-size:11px;margin:0 0 4px">${certsOnly ? 'Event coordinators' : 'Results room'} · live</p><h2>${certsOnly ? 'Certificates' : 'Scores &amp; Winners'}</h2>
+        <p>${certsOnly ? 'Places update live as judges score. Write winners&rsquo; certificates once an event shows FINAL.' : 'Updates live as judges enter scores. Write winners&rsquo; certificates once an event shows FINAL.'}</p></div>
         <button class="btn small" onclick="print()">Print this page</button></div>
       <div class="tabs" role="tablist">${DATA.events.map(e => { const k = rowsOf(e).filter(r => r.n === judgesOf(e.id).length).length;
         return `<button class="tab" role="tab" data-t="${e.id}" aria-selected="${tab === e.id}">${esc(e.name)} <em class="${fin(e.id) ? 'fin' : ''}">${fin(e.id) ? 'FINAL' : k + '/' + e.teams.length}</em></button>`; }).join('')}
         <button class="tab" role="tab" data-t="att" aria-selected="${tab === 'att'}">Attendance <em>${attCounts(A).P}/${ALLS.length}</em></button>
         <button class="tab" role="tab" data-t="cl" aria-selected="${tab === 'cl'}">Certificate list</button>
-        <button class="tab" role="tab" data-t="ci" aria-selected="${tab === 'ci'}">Check-in <em>${new Set(cks.filter(c => c.venue === 'reg').map(c => c.team)).size}/${Object.keys(TEAMS).length}</em></button>
+        ${certsOnly ? '' : `<button class="tab" role="tab" data-t="ci" aria-selected="${tab === 'ci'}">Check-in <em>${new Set(cks.filter(c => c.venue === 'reg').map(c => c.team)).size}/${Object.keys(TEAMS).length}</em></button>`}
         ${isAdmin ? `<button class="tab" role="tab" data-t="pins" aria-selected="${tab === 'pins'}">Team logins</button><button class="tab" role="tab" data-t="acc" aria-selected="${tab === 'acc'}">Staff logins</button>` : ''}
         <button class="tab" role="tab" data-t="rt" aria-selected="${tab === 'rt'}">Rolling Trophy <em class="${DATA.events.every(e => fin(e.id)) ? 'fin' : ''}">${DATA.events.filter(e => fin(e.id)).length}/4</em></button></div>
       <div id="pane"></div>`;
     document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; $('#pane').innerHTML = ''; render(); });
-    if (tab === 'ci') { $('#pane').innerHTML = boardHTML(cks, true, A); wireMarks($('#pane')); return; }
+    if (tab === 'ci' && !certsOnly) { $('#pane').innerHTML = boardHTML(cks, true, A); wireMarks($('#pane')); return; }
     if (tab === 'att') { $('#pane').innerHTML = attBar(attCounts(A)) + attHTML(A, { canMark: isAdmin, group: 'event' }); if (isAdmin) wireAtt($('#pane'), A, 'admin'); return; }
     if (tab === 'cl') { $('#pane').innerHTML = `<div class="banner" style="border-color:var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <span>Participation certificates: only students marked <b>Present</b>, with the name as corrected at the desk. ${attCounts(A).P} certificates.</span>
@@ -1110,7 +1117,7 @@ function resultsView(isAdmin) {
     const tie = rows.some(x => x.rank && x.rank <= 3 && rows.filter(y => y.rank === x.rank).length > 1);
     const pods = [1, 2, 3].map(p => { const g = top[p - 1]; if (!g.length) return `<div class="pod p${p}"><div class="pl">${['1ST', '2ND', '3RD'][p - 1]}</div><div class="s" style="margin-top:10px">—</div></div>`;
       return g.map(x => { const id = `${E.id}_${x.no}`, w = !!certs.find(c => c.id === id && c.done);
-        return `<div class="pod p${p}${w ? ' writ' : ''}"><div class="pl">${['1ST', '2ND', '3RD'][p - 1]}</div><span class="score">${x.avg}</span>
+        return `<div class="pod p${p}${w ? ' writ' : ''}"><div class="pl">${['1ST', '2ND', '3RD'][p - 1]}</div>${certsOnly ? '' : `<span class="score">${x.avg}</span>`}
           <b>${esc(x.team)} <span class="s">· ${x.no}</span></b><div class="s">${esc(x.school)}</div><div class="mem">${roster(TEAMS[x.no]).map(r => stOf(r, A) === 'A' ? `<s>${esc(who(r, A))}</s> (absent)` : esc(who(r, A))).join('<br>')}</div>
           <label><input type="checkbox" data-cert="${id}" ${w ? 'checked' : ''} ${isFin ? '' : 'disabled'}> Certificates written</label></div>`; }).join(''); }).join('');
     const jst = J.map(j => { const f = status.find(s => s.id === j.id && s.final);
@@ -1121,11 +1128,13 @@ function resultsView(isAdmin) {
       <p style="margin:0 0 12px">${jst}</p>
       ${tie ? '<p class="tie">⚠ Tie in the top 3: check the judges’ notes or ask the judges to break the tie before writing certificates.</p>' : ''}
       <div class="podium">${pods}</div>
+      ${certsOnly ? `<table class="res"><thead><tr><th>Place</th><th>Team</th><th class="hide-m">School</th></tr></thead>
+      <tbody>${rows.map(x => `<tr class="${x.avg === null ? 'pending' : ''}"><td class="big">${x.rank ?? '–'}</td><td><b>${x.no}</b> · ${esc(x.team)}<div class="s" style="color:var(--muted);font-size:12px">${esc(x.members)}</div></td><td class="hide-m">${esc(x.school)}</td></tr>`).join('')}</tbody></table>` : `
       <table class="res"><thead><tr><th>#</th><th>Team</th><th class="hide-m">School</th>${J.map(j => `<th>${esc(j.label.split(' · ')[0])}</th>`).join('')}<th>Average</th><th class="hide-m">Notes</th></tr></thead>
       <tbody>${rows.map(x => `<tr class="${x.avg === null ? 'pending' : ''}"><td class="big">${x.rank ?? '–'}</td><td><b>${x.no}</b> · ${esc(x.team)}<div class="s" style="color:var(--muted);font-size:12px">${esc(x.members)}</div></td>
         <td class="hide-m">${esc(x.school)}</td>${x.per.map(p => `<td class="n" title="${p.s ? C.map((c, i) => c.n + ': ' + (p.s['c' + (i + 1)] ?? '–')).join(' | ') : ''}">${p.T ?? '–'}</td>`).join('')}
         <td class="big">${x.avg ?? '–'}</td><td class="hide-m" style="font-size:12px;color:var(--muted)">${x.per.filter(p => p.s?.comment).map(p => `${esc(p.j.label.split(' · ')[0])}: ${esc(p.s.comment)}`).join('<br>')}</td></tr>`).join('')}</tbody></table>
-      <p class="note">Each judge's total is out of ${MX} (${C.map(c => `${esc(c.n)} /${cmax(c)}`).join(' · ')}). The team's score is the average of both judges. Hover a judge's score to see the breakdown.</p>`;
+      <p class="note">Each judge's total is out of ${MX} (${C.map(c => `${esc(c.n)} /${cmax(c)}`).join(' · ')}). The team's score is the average of both judges. Hover a judge's score to see the breakdown.</p>`}`;
     $('#pane').querySelectorAll('[data-cert]').forEach(cb => cb.onchange = () => api.save('certs', cb.dataset.cert, { done: cb.checked, event: E.id }));
     $('#pane').querySelectorAll('[data-unlock]').forEach(b => b.onclick = () => confirm(`Let ${b.dataset.unlock} edit scores again?`) && api.save('status', b.dataset.unlock, { final: false }));
   }

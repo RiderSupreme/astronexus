@@ -9,7 +9,7 @@ The portal is one file, `starbase.html`, and runs on any static website. Scores 
 4. **Build > Firestore Database > Create database.** Pick the `europe-west` or `me-central` location and start in **production mode**.
 5. **Firestore > Rules:** paste everything from `firestore.rules` and click **Publish**.
 
-## 2. Create the 17 logins
+## 2. Create the 22 logins
 Go to **Authentication > Users > Add user**. The email is the login ID plus `@starbase.astronexus26.app` (no emails are sent there).
 The passwords are in **Starbase Nexus Logins.pdf** (kept outside this folder, do not upload it). Each group shares one login. Judges 1-2 score HelioScale, 3-4 LaunchX, 5-6 TerraFab, 7-8 Lost in Orbit.
 
@@ -29,7 +29,12 @@ The passwords are in **Starbase Nexus Logins.pdf** (kept outside this folder, do
 | `lostinorbit` | Lost in Orbit event head | Lost in Orbit attendance (can mark), live venue map |
 | `logistics` | Team Logistics | All four events' attendance and team check-ins (can mark) |
 | `volunteers` | Registration desk and volunteers | Roll call: present / absent for every student, fix names |
-| `results` | Certificate writers / results room | Live scores, podiums, certificate list of present students |
+| `results1` | Results room | Live scores from both judges, averages, podiums, certificate list |
+| `results2` | Results room | Same as `results1` |
+| `coordinator1` | Event coordinator | Places and podiums for all four events, certificate list, tick "Certificates written" (no raw scores) |
+| `coordinator2` | Event coordinator | Same as `coordinator1` |
+| `coordinator3` | Event coordinator | Same as `coordinator1` |
+| `coordinator4` | Event coordinator | Same as `coordinator1` |
 | `core` | Core team and NMS teachers on duty | Live overview of all events (view only) |
 | `admin` | Sriram | Everything, plus unlocking scores and creating team PINs |
 
@@ -42,13 +47,13 @@ Event heads can only mark students in their own event; the database rules enforc
 4. **Authentication > Settings > Authorized domains:** add `astronexusnms.com` (and `www.astronexusnms.com`).
 
 ## 4. Before the event (rehearsal)
-- On Tuesday 3 November, sign in as each of the 8 judges on the device they'll use and enter test scores. Sign in as `results` in the certificate room and watch them appear.
+- On Tuesday 3 November, sign in as each of the 8 judges on the device they'll use and enter test scores. Sign in as `results1` in the results room and watch them appear.
 - Then clear the test data: **Firestore > Data**, delete the `scores`, `status`, `certs`, `checkins` and `attendance` collections. Keep `pins`.
 
 ## On the day
 - **Judges (2 per event):** each judge signs in with their own ID (e.g. `judge1`) and taps one level per criterion. No judge names or photos are shown. Scores save automatically, even if the connection drops, and sync when it's back. When finished, press **Submit final scores**, which locks that judge's scores.
 - **Rubrics in the tool:** HelioScale 3 criteria (out of 90) · LaunchX 4 criteria: Altitude, Range, Structural Integrity, Teamwork & Launch Safety (out of 120) · TerraFab 3 criteria with 0/10/20/30 ticks plus Critics' Choice 0–10 (out of 100) · Lost in Orbit 3 criteria (out of 90).
-- **Results room:** sign in as `results`. Each event shows Judge 1, Judge 2 and the **average**, which decides the ranking and the 1st/2nd/3rd podium. An event shows **FINAL** once both judges have submitted; write the certificates then and tick **Certificates written**.
+- **Results room:** sign in as `results1` or `results2`. Each event shows Judge 1, Judge 2 and the **average**, which decides the ranking and the 1st/2nd/3rd podium. An event shows **FINAL** once both judges have submitted; write the certificates then and tick **Certificates written**.
 - **Rolling Trophy:** events have different totals, so each school's best team score per event is turned into a percentage and the four are added (out of 400).
 - **Mistake after submitting?** Sign in as `admin`, open the event and press **Unlock** next to that judge.
 - **Backup:** keep printed score sheets at each venue in case the internet fails completely.
@@ -83,7 +88,7 @@ Tips: avoid shadows across the page, don't fold the corners, and fill bubbles fu
 The security rules (enforced by Firebase, not by the page) mean:
 - each judge can only write scores for their own event, and only whole numbers from 0 to 30;
 - no one can edit an event after it's submitted, except by admin unlock;
-- only `results` and `admin` can see every event's scores and the certificate ticks;
+- only `results1`, `results2` and `admin` can see judges' scores; coordinators see places only on screen, and can tick certificates;
 - a team can only check itself in with the correct PIN, and can't see any other team's data or anyone's scores;
 - only admin can see the PINs;
 - nobody without a login can read or write anything.
