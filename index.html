@@ -591,6 +591,60 @@
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
 
+  /* Event-day tools. Polaris is for everyone on campus, so it gets the
+     filled button; Starbase is for teams, judges and staff. */
+  /* Date pill and the two buttons share one row on desktop so the hero
+     gains no height; they wrap underneath on narrow screens. */
+  .hero__meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.7rem;
+    margin-top: 2.6rem;
+  }
+
+  .hero__meta .hero__status { margin-top: 0; }
+
+  .hero__apps {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.7rem;
+  }
+
+  .hero__app {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.72rem 1.15rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    font-size: 0.86rem;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--text);
+    text-decoration: none;
+    background: #0a0806b3;
+    transition: border-color 0.3s ease, background-color 0.3s ease;
+  }
+
+  .hero__app-name {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .hero__app .arrow { transition: transform 0.3s ease; }
+  .hero__app:hover, .hero__app:focus-visible { border-color: var(--accent); }
+  .hero__app:hover .arrow, .hero__app:focus-visible .arrow { transform: translateX(3px); }
+
+  .hero__app--primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .hero__app--primary .hero__app-name { color: #0a0806a6; }
+  .hero__app--primary:hover, .hero__app--primary:focus-visible { background: var(--accent-hot); border-color: var(--accent-hot); }
+
   .hero__foot {
     width: 100%;
     max-width: 1200px;
@@ -1019,6 +1073,12 @@
     /* The date and time will not sit on one line at phone widths with the
        full tracking, and a two-line pill reads as broken rather than
        deliberate. */
+    /* The buttons wrap under the date here; move some of the space above the
+       pill to below the buttons so they don't sit on the bottom rule. */
+    .hero__meta { margin-top: 1.6rem; margin-bottom: 1rem; }
+    .hero__app { font-size: 0.8rem; padding: 0.66rem 1rem; }
+    .hero__app-name { display: none; }
+
     .hero__status {
       font-size: 0.6rem;
       letter-spacing: 0.1em;
@@ -1120,7 +1180,14 @@
 
     <p class="hero__tagline" data-reveal="fadeUp" data-reveal-split="lines" data-reveal-delay="0.15">The UAE&rsquo;s first student-led space event &mdash; where the next generation of researchers, builders, and orbital thinkers converge.</p>
 
+    <div class="hero__meta">
     <span class="hero__status" data-reveal="fadeUp" data-reveal-delay="0.35">Thursday, 5 November 2026 &middot; 8:00 AM &ndash; 1:30 PM</span>
+
+    <nav class="hero__apps" aria-label="Event-day tools" data-reveal="fadeUp" data-reveal-delay="0.42">
+      <a class="hero__app hero__app--primary" href="polaris.html">Campus map <span class="hero__app-name">Polaris</span><span class="arrow" aria-hidden="true">&rarr;</span></a>
+      <a class="hero__app" href="starbase.html">Check-in &amp; judging <span class="hero__app-name">Starbase</span><span class="arrow" aria-hidden="true">&rarr;</span></a>
+    </nav>
+    </div>
 
     <div class="hero__foot" data-reveal="fadeUp" data-reveal-delay="0.5">
       <div class="rule"></div>
@@ -1492,7 +1559,7 @@
     var wordmark = scene.querySelector('.wordmark');
     var marsL = scene.querySelector('.mars');
     var supporting = [].slice.call(document.querySelectorAll(
-      '.hero__eyebrow, .hero__tagline, .hero__status, .hero__foot, .hero__orbit'));
+      '.hero__eyebrow, .hero__tagline, .hero__status, .hero__apps, .hero__foot, .hero__orbit'));
 
     // Fractions of the logo box, straight from the artwork.
     var MARS_C = [0.8055, 0.3726];

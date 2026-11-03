@@ -297,6 +297,17 @@ body::after { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events
 .lbox input:focus, .cibox input:focus, .attf input:focus, .cr input:focus { border-color: var(--pink) !important; box-shadow: 0 0 0 3px rgba(222,166,81,.22); }
 .hall { background: radial-gradient(60% 50% at 50% 0%, rgba(219,158,66,.25), transparent 60%), radial-gradient(50% 50% at 0% 100%, rgba(118,67,22,.35), transparent 60%), rgba(4,3,2,.72) !important; }
 @media print { #stars, body::after { display: none; } }
+
+/* ---------- login and team check-in fill the screen and don't scroll ----------
+   The judge, results and attendance screens are lists of 15+ teams, so those
+   still scroll. If a phone is held sideways and the card can't fit, it scrolls
+   inside its own screen rather than moving the page. */
+html:has(#vLogin:not([hidden])), html:has(#vCheck:not([hidden])),
+html:has(#vLogin:not([hidden])) body, html:has(#vCheck:not([hidden])) body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+.login, .ci { min-height: 0; height: 100vh; height: 100dvh; overflow-y: auto; place-items: initial; box-sizing: border-box; }
+.lbox, .cibox { margin: auto; }
+/* demo mode only (gone once Firebase is connected): the quick-login list takes whatever height is left */
+.demo { max-height: clamp(96px, calc(100vh - 520px), 30vh); overflow-y: auto; overscroll-behavior: contain; }
 </style>
 </head>
 <body>
