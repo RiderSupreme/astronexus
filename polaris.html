@@ -284,7 +284,7 @@ body { box-sizing: border-box; display: flex; flex-direction: column; justify-co
       <div class="anx-here" id="anxHere" hidden><i></i><span></span></div>
       <p class="anx-kicker mono">Welcome to GEMS New Millennium School, Al Khail</p>
       <h2 class="anx-h1">Polaris<small>AstroNexus 2026 · your guiding star on campus</small></h2>
-      <p class="anx-lede mono">Pick an event below. Polaris guides you, turn by turn,<br>from the School Reception to your venue.<br>Thursday · 5 November 2026 · 7:30 am – 1:20 pm</p>
+      <p class="anx-lede mono">Pick an event below. Polaris guides you, turn by turn,<br>from the School Reception to your venue.<br>Thursday · 5 November 2026 · 8:30 am – 1:20 pm</p>
     </div>
     <div>
       <div class="anx-ctaRow">
@@ -439,7 +439,7 @@ body { box-sizing: border-box; display: flex; flex-direction: column; justify-co
   function welcome() {
     if (KIOSK) { $('#anxHere').hidden = false; $('#anxHere span').textContent = 'You are here · ' + P[KIOSK].name; $('#anxGo').innerHTML = 'Touch to find your way <span aria-hidden="true">→</span>'; }
     const n = dubai(); let txt;
-    if (n.day < EVENT_DAY) { const d = Math.ceil((new Date(EVENT_DAY + 'T07:30:00+04:00') - new Date()) / 864e5); txt = `T-minus ${d} day${d === 1 ? '' : 's'} to launch`; }
+    if (n.day < EVENT_DAY) { const d = Math.ceil((new Date(EVENT_DAY + 'T08:30:00+04:00') - new Date()) / 864e5); txt = `T-minus ${d} day${d === 1 ? '' : 's'} to launch`; }
     else if (n.day === EVENT_DAY) { const l = EVENTS.filter(live).map(e => e.name); txt = l.length ? 'Live now · ' + l.join(' · ') : 'Mission day · 5 November'; }
     else txt = 'Mission complete · thank you';
     $('#anxCount').textContent = txt;
