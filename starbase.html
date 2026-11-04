@@ -989,15 +989,22 @@ function wireAtt(root, A, by) {
 const attMap = d => Object.fromEntries(d.map(x => [x.id, x]));
 function deskView() {
   $('#whoName').textContent = 'Volunteers'; $('#whoRole').textContent = 'Registration roll call';
-  let A = {}, q = '', school = '';
+  let A = {}, q = '', school = '', cks = [], tab = 'rc';
   $('#main').innerHTML = `<div class="hero"><div><p class="mono" style="color:var(--sand);font-size:11px;margin:0 0 4px">Registration desk · live</p><h2>Roll call</h2>
     <p>Pick the school as it arrives and tap <b>Present</b> or <b>Absent</b> for each student. Tap again to clear. Event heads and the certificate team see it straight away.</p></div>${scanBtn('bScanA', 'Scan attendance sheet')}</div>
-    <div id="aBar"></div><div class="attf"><select id="aSch"><option value="">All schools</option>${SCHOOLS.map(x => `<option>${esc(x)}</option>`).join('')}</select>
-    <input id="aQ" type="search" placeholder="Search a student, team or Team ID"></div><div id="aList"></div>`;
-  const render = () => { $('#aBar').innerHTML = attBar(attCounts(A)); $('#aList').innerHTML = attHTML(A, { canMark: true, q, school }); wireAtt($('#aList'), A, 'registration'); };
+    <div class="tabs" role="tablist"><button class="tab" role="tab" data-t="rc" aria-selected="true">Roll call</button><button class="tab" role="tab" data-t="map" aria-selected="false">Teams by venue</button></div>
+    <div id="vMap" hidden></div><div id="vRc"><div id="aBar"></div><div class="attf"><select id="aSch"><option value="">All schools</option>${SCHOOLS.map(x => `<option>${esc(x)}</option>`).join('')}</select>
+    <input id="aQ" type="search" placeholder="Search a student, team or Team ID"></div><div id="aList"></div></div>`;
+  // Teams by venue: view only for volunteers (event heads and logistics mark check-ins)
+  const render = () => { if (tab === 'map') { $('#vMap').innerHTML = boardHTML(cks, false, A); return; }
+    $('#aBar').innerHTML = attBar(attCounts(A)); $('#aList').innerHTML = attHTML(A, { canMark: true, q, school }); wireAtt($('#aList'), A, 'registration'); };
+  document.querySelectorAll('#main [data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t;
+    document.querySelectorAll('#main [data-t]').forEach(x => x.setAttribute('aria-selected', x === b));
+    $('#vMap').hidden = tab !== 'map'; $('#vRc').hidden = tab === 'map'; render(); });
   $('#bScanA').onclick = () => scanDialog({ type: 'att' }, saveAtt('volunteers'));
   $('#aSch').onchange = e => { school = e.target.value; render(); }; $('#aQ').oninput = e => { q = e.target.value; render(); };
   unsub.push(api.watch('attendance', d => { A = attMap(d); render(); }));
+  unsub.push(api.watch('checkins', d => { cks = live(d); if (tab === 'map') render(); }));
 }
 function certListHTML(A) {   // participation certificates: present students only, by school
   return SCHOOLS.map(sc => { const rs = ALLS.filter(r => r.T.school === sc && stOf(r, A) === 'P'); if (!rs.length) return '';
