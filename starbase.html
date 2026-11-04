@@ -1002,7 +1002,9 @@ function wireMarks(root) {
 const live = d => d.filter(c => !c.removed && c.at);
 function checkinView(only, label) {
   $('#whoName').textContent = label || 'Event Heads'; $('#whoRole').textContent = 'Attendance · check-in';
-  let cks = [], A = {}, tab = only || DATA.events[0].id;
+  // Logistics (no single event) handles QR check-ins across all events, so it opens on the venue board;
+  // an event head opens on their own event's attendance list.
+  let cks = [], A = {}, tab = only || 'map';
   const render = () => {
     const tabs = `<div class="tabs" role="tablist">${DATA.events.filter(E => !only || E.id === only).map(E => { const c = attCounts(A, ALLS.filter(r => r.T.ev.id === E.id));
       return `<button class="tab" role="tab" data-t="${E.id}" aria-selected="${tab === E.id}">${esc(E.name)} <em>${c.P}/${c.N}</em></button>`; }).join('')}
