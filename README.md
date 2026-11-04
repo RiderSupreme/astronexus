@@ -3,7 +3,7 @@
 Website for **AstroNexus '26** — the UAE's first student-led space event, run by the
 Al Amal Space Club and the Physics Department at GEMS New Millennium School.
 
-**5 November 2026 · 8:30 AM – 1:30 PM**
+**5 November 2026 · 8:30 AM – 1:20 PM**
 
 ## The four challenges
 

@@ -614,7 +614,7 @@ function teamCheckin(vid) {
   const done = T => {
     const mine = MAIN_VENUE[T.ev.id], right = V.all || (V.ev || []).includes(T.ev.id);
     const next = vid === 'reg'
-      ? `<div class="nextbox"><b>Registered ✓</b><br>Stay in the Zayed Hall for the opening ceremony (8:00 am). At 8:45 am go to <b>${esc(VENUES[mine].name)}</b> for ${esc(T.ev.name)} and scan the QR there.</div>`
+      ? `<div class="nextbox"><b>Registered ✓</b><br>Stay in the Zayed Hall for the opening ceremony (8:45 am). At 10:00 am go to <b>${esc(VENUES[mine].name)}</b> for ${esc(T.ev.name)} and scan the QR there.</div>`
       : right ? `<div class="nextbox"><b>You're in the right place.</b> Find your table (${esc(T.no)}) and wait for the event heads to start ${esc(T.ev.name)}.</div>`
       : `<div class="nextbox warn"><b>Wrong venue.</b> ${esc(T.ev.name)} is at <b>${esc(VENUES[mine].name)}</b> (${esc(VENUES[mine].where)}). Please go there and scan the QR code.</div>`;
     box.innerHTML = `<div class="tick">✓</div><div class="where">Checked in · ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>

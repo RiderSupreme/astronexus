@@ -387,9 +387,9 @@ body { box-sizing: border-box; display: flex; flex-direction: column; justify-co
   ];
   // Places (node: null = still to be mapped)
   const P = {
-    exit3:  { lab: 'below', name: 'Exit 3', node: 'X3', type: 'gate', fl: 'GATE', sub: 'North-east gate · arrivals from 7:30 am' },
-    exit4:  { lab: 'below', name: 'Exit 4', node: 'X4', type: 'gate', fl: 'GATE', sub: 'South-east gate · arrivals from 7:30 am' },
-    recep:  { lab: 'below', name: 'School Reception', node: 'EIN', type: 'venue', fl: 'GF', sub: 'Main entrance · arrival from 7:30 am' },
+    exit3:  { lab: 'below', name: 'Exit 3', node: 'X3', type: 'gate', fl: 'GATE', sub: 'North-east gate · arrivals from 8:30 am' },
+    exit4:  { lab: 'below', name: 'Exit 4', node: 'X4', type: 'gate', fl: 'GATE', sub: 'South-east gate · arrivals from 8:30 am' },
+    recep:  { lab: 'below', name: 'School Reception', node: 'EIN', type: 'venue', fl: 'GF', sub: 'Main entrance · arrival from 8:30 am' },
     zayed:  { name: 'Zayed Hall', node: 'ZAY', type: 'venue', fl: '1F', sub: 'Opening, awards and TerraFab' },
     champ:  { name: 'Champions Club', node: 'CHA', type: 'venue', fl: 'GF', sub: 'HelioScale' },
     canteen:{ lab: 'left', name: 'Canteen', node: 'CAN', type: 'venue', fl: 'GF', sub: 'Registration · LaunchX rocket build' },
@@ -406,15 +406,15 @@ body { box-sizing: border-box; display: flex; flex-direction: column; justify-co
     RE: 'Reception lobby to the courtyard', CY: 'Crossing the courtyard', RW: 'Into the west wing corridor', WW: 'West wing junction', STR: 'West wing staircase',
     ZAY: 'Zayed Hall entrance (1st floor)', CHA: 'Champions Club entrance', CMR: 'Common Room (3rd floor)', WL1: 'West wing side door', WL: 'West walkway', WC: 'Canteen door', CAN: 'Canteen', WS: 'Soccer Field gate', FLD: 'Soccer Field' };
   const EVENTS = [
-    { name: 'Arrival', t: ['07:30', '07:45'], to: 'recep', c: '#ede09c', who: 'All schools' },
-    { name: 'Registration', t: ['07:45', '08:00'], to: 'canteen', c: '#d9a454', who: 'All schools' },
-    { name: 'Opening Ceremony', t: ['08:00', '08:45'], to: 'zayed', c: '#dca85b', who: 'Everyone' },
-    { name: 'HelioScale', t: ['08:45', '12:10'], to: 'champ', also: 'field', c: '#ede09c', who: 'Grades 11–12' },
-    { name: 'LaunchX', t: ['08:45', '12:10'], to: 'canteen', also: 'field', c: '#d6b27c', who: 'Grades 9–10' },
-    { name: 'TerraFab', t: ['09:00', '12:10'], to: 'zayed', c: '#89bec7', who: 'Grades 7–8' },
-    { name: 'Lost in Orbit', t: ['08:45', '12:10'], to: 'blackbox', c: '#d6b27c', who: 'Grade 6' },
-    { name: 'Return to Zayed Hall', t: ['12:20', '12:30'], to: 'zayed', c: '#6dafbb', who: 'Everyone, after the break at your venue' },
-    { name: 'Awards & Closing', t: ['12:30', '13:20'], to: 'zayed', c: '#dca85b', who: 'Everyone' },
+    // Official order of events, 5 November. Arrival is a single time, so it has no end.
+    { name: 'Arrival', t: ['08:30', '08:30'], to: 'recep', c: '#ede09c', who: 'All schools' },
+    { name: 'Registration', t: ['08:30', '08:45'], to: 'canteen', c: '#d9a454', who: 'All schools' },
+    { name: 'Opening Ceremony', t: ['08:45', '10:00'], to: 'zayed', c: '#dca85b', who: 'Everyone' },
+    { name: 'HelioScale', t: ['10:00', '12:00'], to: 'champ', also: 'field', c: '#ede09c', who: 'Grades 11–12' },
+    { name: 'LaunchX', t: ['10:00', '12:00'], to: 'canteen', also: 'field', c: '#d6b27c', who: 'Grades 9–10' },
+    { name: 'TerraFab', t: ['10:00', '12:00'], to: 'zayed', c: '#89bec7', who: 'Grades 7–8' },
+    { name: 'Lost in Orbit', t: ['10:00', '12:00'], to: 'blackbox', c: '#d6b27c', who: 'Grade 6' },
+    { name: 'Prize Distribution & Closing', t: ['12:30', '13:20'], to: 'zayed', c: '#dca85b', who: 'Everyone' },
   ];
 
   // Vector campus (traced from the satellite view)
@@ -436,6 +436,7 @@ body { box-sizing: border-box; display: flex; flex-direction: column; justify-co
 
   /* ---------- schedule helpers ---------- */
   const toMin = s => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
+  const span = t => t[0] === t[1] ? fmt(t[0]) : fmt(t[0]) + ' – ' + fmt(t[1]);
   const fmt = s => { let [h, m] = s.split(':').map(Number); const a = h >= 12 ? 'pm' : 'am'; h = h % 12 || 12; return `${h}:${String(m).padStart(2, '0')} ${a}`; };
   const dubai = () => { const d = new Date(); return { day: d.toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' }), t: new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Dubai' })) }; };
   const live = ev => { const n = dubai(); const m = n.t.getHours() * 60 + n.t.getMinutes(); return n.day === EVENT_DAY && m >= toMin(ev.t[0]) && m < toMin(ev.t[1]); };
@@ -449,7 +450,7 @@ body { box-sizing: border-box; display: flex; flex-direction: column; justify-co
     else txt = 'Mission complete · thank you';
     $('#anxCount').textContent = txt;
     $('#anxTiles').innerHTML = EVENTS.map((e, k) => `<button class="anx-tile" data-ev="${k}">
-      <span class="mono"><em>${fmt(e.t[0])} – ${fmt(e.t[1])}</em>${live(e) ? ' <span class="live">● Live</span>' : ''}</span><b><i style="background:${e.c}"></i>${e.name}</b>
+      <span class="mono"><em>${span(e.t)}</em>${live(e) ? ' <span class="live">● Live</span>' : ''}</span><b><i style="background:${e.c}"></i>${e.name}</b>
       <span class="mono">${P[e.to].name}${P[e.to].fl && P[e.to].fl !== 'GF' ? ' · ' + P[e.to].fl : ''}${e.also ? ' + ' + P[e.also].name : ''}</span></button>`).join('');
     $('#anxTiles').querySelectorAll('[data-ev]').forEach(b => b.onclick = () => { const e = EVENTS[+b.dataset.ev]; st.ev = +b.dataset.ev; openNav(e.to); });
   }
@@ -696,7 +697,7 @@ body { box-sizing: border-box; display: flex; flex-direction: column; justify-co
   function renderCard() {
     const c = $('#anxCard'), T = P[st.to], ev = st.ev != null ? EVENTS[st.ev] : null;
     if (!T.node) {
-      c.innerHTML = `<div class="anx-cardHead"><span class="t mono">${ev ? ev.name : 'Destination'}</span><span class="m">${ev ? fmt(ev.t[0]) + ' – ' + fmt(ev.t[1]) : ''}</span></div>
+      c.innerHTML = `<div class="anx-cardHead"><span class="t mono">${ev ? ev.name : 'Destination'}</span><span class="m">${ev ? span(ev.t) : ''}</span></div>
         <div class="anx-pending"><b>${T.name}</b> (${T.sub}) is not drawn on this map yet. Take the stairs or lift to the 3rd floor and follow the AstroNexus signs to the Common Room.</div>`;
       return;
     }
