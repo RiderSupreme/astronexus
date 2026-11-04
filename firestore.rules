@@ -28,6 +28,8 @@ service cloud.firestore {
                                           || (arole() == 'head' && acct().ev == ev)); }
     function core() { return signedIn() && (me() == 'core' || arole() == 'core'); }
     function desk() { return signedIn() && (me() == 'volunteers' || arole() == 'volunteers'); }
+    // console builds the results slides: certificate list (attendance) and Rolling Trophy (scores, status). Read-only.
+    function slides() { return signedIn() && me() == 'console'; }
     function isFinal(jid) {
       return exists(/databases/$(database)/documents/status/$(jid))
         && get(/databases/$(database)/documents/status/$(jid)).data.final == true;
@@ -46,7 +48,7 @@ service cloud.firestore {
     }
     // One document per judge per team: <judge id>_<team no>, e.g. judge1_HS-03. Levels 0-30; TerraFab c4 (Critics' Choice) 0-10
     match /scores/{id} {
-      allow read: if staff() || coord() || (judge() && resource.data.judge == me());
+      allow read: if staff() || coord() || slides() || (judge() && resource.data.judge == me());
       allow create, update: if (judge() && scoreDoc(me(), id) && !isFinal(me()))
         // the director can enter or correct any judge's scores, even after that judge submits
         || (director() && request.resource.data.judge in JEV() && scoreDoc(request.resource.data.judge, id));
@@ -74,7 +76,7 @@ service cloud.firestore {
     }
     // attendance/<team no>_<i>: roll call. Marked at the registration desk (or by event heads at a venue); read by event heads and the results room
     match /attendance/{id} {
-      allow read: if staff() || coord() || heads() || desk() || core();
+      allow read: if staff() || coord() || slides() || heads() || desk() || core();
       allow create, update: if (desk() || admin() || headFor(request.resource.data.event))
         && request.resource.data.event in ['helioscale', 'launchx', 'terrafab', 'lostinorbit']
         && id == request.resource.data.team + '_' + string(request.resource.data.i)

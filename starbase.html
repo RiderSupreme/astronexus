@@ -392,6 +392,7 @@ const ROLE = {
   coordinator3: { kind: 'certs', grp: 'Event coordinators', label: 'Coordinator 3 · certificates' },
   coordinator4: { kind: 'certs', grp: 'Event coordinators', label: 'Coordinator 4 · certificates' },
   core:        { kind: 'core', grp: 'Teams', label: 'Core team & teachers' },
+  console:     { kind: 'console', grp: 'Teams', label: 'Results slides' },
   director:    { kind: 'admin', super: true, grp: 'Teams', label: 'Director' },
   admin:       { kind: 'admin', grp: 'Teams', label: 'Admin' },
 };
@@ -627,6 +628,7 @@ function route(user, R) {
   window.anxFX && anxFX(R.kind === 'judge' ? .5 : 1);
   if (R.kind === 'judge') judgeView(EV[R.ev], user, R);
   else if (R.kind === 'results' || R.kind === 'admin' || R.kind === 'certs') resultsView(R.kind === 'admin', R.kind === 'certs', !!R.super);
+  else if (R.kind === 'console') resultsView(false, false, false, true);
   else if (R.kind === 'head') checkinView(R.ev, R.label);
   else if (R.kind === 'desk') deskView();
   else if (R.kind === 'core') coreView();
@@ -1120,17 +1122,21 @@ function accPane() {
 // every event, but not the judges' scores, averages or notes.
 // isDirector: the director has everything admin has, plus team PINs, staff logins, locking any
 // login, editing any judge's scores and clearing test data.
-function resultsView(isAdmin, certsOnly, isDirector) {
-  $('#whoName').textContent = isDirector ? 'Director' : isAdmin ? 'Admin' : certsOnly ? 'Event coordinator' : 'Results Room'; $('#whoRole').textContent = certsOnly ? 'Places · certificate writing' : 'Live scores · certificate writing';
-  let tab = DATA.events[0].id, scores = [], status = [], certs = [], editingJ = null, cks = [], pinsOpen = false, A = {};
+// slides: the console login, which builds the results slides. It sees only the certificate list
+// and the Rolling Trophy, and can change nothing.
+function resultsView(isAdmin, certsOnly, isDirector, slides) {
+  $('#whoName').textContent = slides ? 'Results slides' : isDirector ? 'Director' : isAdmin ? 'Admin' : certsOnly ? 'Event coordinator' : 'Results Room'; $('#whoRole').textContent = slides ? 'Certificate list · Rolling Trophy' : certsOnly ? 'Places · certificate writing' : 'Live scores · certificate writing';
+  let tab = slides ? 'cl' : DATA.events[0].id, scores = [], status = [], certs = [], editingJ = null, cks = [], pinsOpen = false, A = {};
   const rowsOf = E => E.teams.map(t => ({ ...t, ...teamScore(E.id, t.no, scores) }));
   const render = () => { if (editingJ || (tab === 'pins' && document.querySelector('.slips')) || (tab === 'acc' && document.querySelector('#accForm')) || (tab === 'wipe' && document.querySelector('#wipeBox'))) return;
     const byEv = id => scores.filter(s => s.event === id), fin = id => evFinal(id, status);
     $('#main').innerHTML = `
-      <div class="hero"><div><p class="mono" style="color:var(--sand);font-size:11px;margin:0 0 4px">${certsOnly ? 'Event coordinators' : 'Results room'} · live</p><h2>${certsOnly ? 'Certificates' : 'Scores &amp; Winners'}</h2>
-        <p>${certsOnly ? 'Places update live as judges score. Write winners&rsquo; certificates once an event shows FINAL.' : 'Updates live as judges enter scores. Write winners&rsquo; certificates once an event shows FINAL.'}</p></div>
+      <div class="hero"><div><p class="mono" style="color:var(--sand);font-size:11px;margin:0 0 4px">${slides ? 'Results slides' : certsOnly ? 'Event coordinators' : 'Results room'} · live</p><h2>${slides ? 'Certificates &amp; Trophy' : certsOnly ? 'Certificates' : 'Scores &amp; Winners'}</h2>
+        <p>${slides ? 'Participation certificate names and the Rolling Trophy standings, for the announcement slides. Both update live.' : certsOnly ? 'Places update live as judges score. Write winners&rsquo; certificates once an event shows FINAL.' : 'Updates live as judges enter scores. Write winners&rsquo; certificates once an event shows FINAL.'}</p></div>
         <button class="btn small" onclick="print()">Print this page</button></div>
-      <div class="tabs" role="tablist">${DATA.events.map(e => { const k = rowsOf(e).filter(r => r.n === judgesOf(e.id).length).length;
+      <div class="tabs" role="tablist">${slides ? `<button class="tab" role="tab" data-t="cl" aria-selected="${tab === 'cl'}">Certificate list</button>
+        <button class="tab" role="tab" data-t="rt" aria-selected="${tab === 'rt'}">Rolling Trophy <em class="${DATA.events.every(e => fin(e.id)) ? 'fin' : ''}">${DATA.events.filter(e => fin(e.id)).length}/4</em></button></div>
+      <div id="pane"></div>` : ''}${slides ? '' : `${DATA.events.map(e => { const k = rowsOf(e).filter(r => r.n === judgesOf(e.id).length).length;
         return `<button class="tab" role="tab" data-t="${e.id}" aria-selected="${tab === e.id}">${esc(e.name)} <em class="${fin(e.id) ? 'fin' : ''}">${fin(e.id) ? 'FINAL' : k + '/' + e.teams.length}</em></button>`; }).join('')}
         <button class="tab" role="tab" data-t="att" aria-selected="${tab === 'att'}">Attendance <em>${attCounts(A).P}/${ALLS.length}</em></button>
         <button class="tab" role="tab" data-t="cl" aria-selected="${tab === 'cl'}">Certificate list</button>
@@ -1138,7 +1144,7 @@ function resultsView(isAdmin, certsOnly, isDirector) {
         ${isDirector ? `<button class="tab" role="tab" data-t="pins" aria-selected="${tab === 'pins'}">Team logins</button><button class="tab" role="tab" data-t="acc" aria-selected="${tab === 'acc'}">Staff logins</button>
           <button class="tab" role="tab" data-t="edit" aria-selected="${tab === 'edit'}">Edit scores</button><button class="tab" role="tab" data-t="wipe" aria-selected="${tab === 'wipe'}">Clear test data</button>` : ''}
         <button class="tab" role="tab" data-t="rt" aria-selected="${tab === 'rt'}">Rolling Trophy <em class="${DATA.events.every(e => fin(e.id)) ? 'fin' : ''}">${DATA.events.filter(e => fin(e.id)).length}/4</em></button></div>
-      <div id="pane"></div>`;
+      <div id="pane"></div>`}`;
     document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; $('#pane').innerHTML = ''; render(); });
     if (tab === 'ci' && !certsOnly) { $('#pane').innerHTML = boardHTML(cks, true, A); wireMarks($('#pane')); return; }
     if (tab === 'att') { $('#pane').innerHTML = attBar(attCounts(A)) + attHTML(A, { canMark: isAdmin, group: 'event' }); if (isAdmin) wireAtt($('#pane'), A, 'admin'); return; }
@@ -1220,8 +1226,10 @@ function resultsView(isAdmin, certsOnly, isDirector) {
   }
   unsub.push(api.watch('scores', d => { scores = d; render(); }));
   unsub.push(api.watch('status', d => { status = d; render(); }));
-  unsub.push(api.watch('certs', d => { certs = d; render(); }));
-  unsub.push(api.watch('checkins', d => { cks = live(d); if (tab !== 'pins') render(); }));
+  if (!slides) {   // the slides login only needs scores, status and attendance
+    unsub.push(api.watch('certs', d => { certs = d; render(); }));
+    unsub.push(api.watch('checkins', d => { cks = live(d); if (tab !== 'pins') render(); }));
+  }
   unsub.push(api.watch('attendance', d => { A = attMap(d); if (tab !== 'pins') render(); }));
 }
 </script>
