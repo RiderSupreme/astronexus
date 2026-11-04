@@ -36,9 +36,9 @@ The passwords are in **Starbase Nexus Logins.pdf** (kept outside this folder, do
 | `coordinator3` | Event coordinator | Same as `coordinator1` |
 | `coordinator4` | Event coordinator | Same as `coordinator1` |
 | `core` | Core team and NMS teachers on duty | Live overview of all events (view only) |
-| `admin` | Admin | Everything the results room sees, unlock a judge who submitted too early, mark any attendance |
+| `admin2` | Admin | Results room view: scores, podiums, attendance, check-ins, certificate list, Rolling Trophy |
 | `console` | Results slides | Certificate list and Rolling Trophy only, read-only, for building the announcement slides |
-| `director` | Director (top account) | Everything admin can do, plus team PINs, staff logins, locking any login, editing any judge's scores and clearing test data |
+| `director` | Director (top account) | Unlocking judges, marking any attendance, team PINs, staff logins, locking any login, editing any judge's scores and clearing test data |
 
 Event heads can only mark students in their own event; the database rules enforce this.
 

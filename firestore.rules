@@ -14,11 +14,11 @@ service cloud.firestore {
     function acct() { return get(/databases/$(database)/documents/accounts/$(me())).data; }
     function hasAcct() { return signedIn() && exists(/databases/$(database)/documents/accounts/$(me())) && acct().get('disabled', false) != true; }
     function arole() { return hasAcct() ? acct().role : ''; }
-    // director: everything admin has, plus team PINs, staff logins, locks, editing any score and clearing test data
+    // director: unlocking judges, any attendance, team PINs, staff logins, locks, editing any score and clearing test data
     function director() { return signedIn() && me() == 'director'; }
-    // admin-level powers (unlock a judge, mark any attendance); the director has all of them too
-    function admin() { return signedIn() && me() in ['admin', 'director']; }
-    function staff() { return signedIn() && (me() in ['results1', 'results2', 'admin', 'director'] || arole() == 'results'); }
+    function staff() { return signedIn() && (me() in ['results1', 'results2', 'director'] || arole() == 'results'); }
+    // admin2: sees the results room, changes nothing
+    function viewer() { return signedIn() && me() == 'admin2'; }
     // event coordinators write certificates: they need the scores to rank teams (the page shows them
     // places only), the certificate ticks, and attendance for the participation list
     function coord() { return signedIn() && (me() in ['coordinator1', 'coordinator2', 'coordinator3', 'coordinator4'] || arole() == 'coordinator'); }
@@ -48,17 +48,17 @@ service cloud.firestore {
     }
     // One document per judge per team: <judge id>_<team no>, e.g. judge1_HS-03. Levels 0-30; TerraFab c4 (Critics' Choice) 0-10
     match /scores/{id} {
-      allow read: if staff() || coord() || slides() || (judge() && resource.data.judge == me());
+      allow read: if staff() || coord() || slides() || viewer() || (judge() && resource.data.judge == me());
       allow create, update: if (judge() && scoreDoc(me(), id) && !isFinal(me()))
         // the director can enter or correct any judge's scores, even after that judge submits
         || (director() && request.resource.data.judge in JEV() && scoreDoc(request.resource.data.judge, id));
       allow delete: if director();
     }
-    // status/<judge id>: { final: true } once that judge submits; admin or the director can unlock. An event is final when both its judges have submitted.
+    // status/<judge id>: { final: true } once that judge submits; only the director can unlock. An event is final when both its judges have submitted.
     match /status/{jid} {
       allow read: if signedIn();
       allow write: if (judge() && jid == me() && request.resource.data.final == true)
-                   || admin();
+                   || director();
     }
     // pins/<team no>: { pin } — secret 4-digit team PINs, created and read by the director only
     match /pins/{team} {
@@ -66,7 +66,7 @@ service cloud.firestore {
     }
     // checkins/<team no>_<venue>: written when a team scans a venue QR and enters its Team ID + PIN
     match /checkins/{id} {
-      allow read: if staff() || heads() || desk() || core();
+      allow read: if staff() || heads() || desk() || core() || viewer();
       allow write: if staff() || heads();                       // manual marking by event heads and logistics
       allow create, update: if request.auth != null              // team phones sign in anonymously
         && request.resource.data.venue in ['reg', 'champ', 'canteen', 'zayed', 'field', 'blackbox']
@@ -76,8 +76,8 @@ service cloud.firestore {
     }
     // attendance/<team no>_<i>: roll call. Marked at the registration desk (or by event heads at a venue); read by event heads and the results room
     match /attendance/{id} {
-      allow read: if staff() || coord() || slides() || heads() || desk() || core();
-      allow create, update: if (desk() || admin() || headFor(request.resource.data.event))
+      allow read: if staff() || coord() || slides() || viewer() || heads() || desk() || core();
+      allow create, update: if (desk() || director() || headFor(request.resource.data.event))
         && request.resource.data.event in ['helioscale', 'launchx', 'terrafab', 'lostinorbit']
         && id == request.resource.data.team + '_' + string(request.resource.data.i)
         && (!('st' in request.resource.data) || request.resource.data.st in ['P', 'A', null])
@@ -96,7 +96,8 @@ service cloud.firestore {
     }
     // certs/<event>_<team no>: { done } ticked by the certificate writers
     match /certs/{id} {
-      allow read, write: if staff() || coord();
+      allow read: if staff() || coord() || viewer();
+      allow write: if staff() || coord();
     }
   }
 }

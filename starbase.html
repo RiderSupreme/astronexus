@@ -394,7 +394,7 @@ const ROLE = {
   core:        { kind: 'core', grp: 'Teams', label: 'Core team & teachers' },
   console:     { kind: 'console', grp: 'Teams', label: 'Results slides' },
   director:    { kind: 'admin', super: true, grp: 'Teams', label: 'Director' },
-  admin:       { kind: 'admin', grp: 'Teams', label: 'Admin' },
+  admin2:      { kind: 'viewer', grp: 'Teams', label: 'Admin' },
 };
 const MAX = 30;
 const WAYFINDER_URL = 'polaris.html';            // link to the campus map page on your site
@@ -629,6 +629,7 @@ function route(user, R) {
   if (R.kind === 'judge') judgeView(EV[R.ev], user, R);
   else if (R.kind === 'results' || R.kind === 'admin' || R.kind === 'certs') resultsView(R.kind === 'admin', R.kind === 'certs', !!R.super);
   else if (R.kind === 'console') resultsView(false, false, false, true);
+  else if (R.kind === 'viewer') resultsView(false, false, false, false, true);
   else if (R.kind === 'head') checkinView(R.ev, R.label);
   else if (R.kind === 'desk') deskView();
   else if (R.kind === 'core') coreView();
@@ -1074,7 +1075,7 @@ function accPane() {
     return `${w[r(w.length)]}-${w[r(w.length)]}-${1000 + r(9000)}`; };
   const draw = () => {
     host.innerHTML = `<div class="banner" style="border-color:var(--line)">Create a login for anyone who needs Check-in &amp; Judging. A login can be used on many devices at the same time, so a whole team can share one.
-      The 23 ready-made logins (judges, event heads, logistics, volunteers, results room, coordinators, core, admin, director) are listed below.</div>
+      The ${Object.keys(ROLE).length} ready-made logins are listed below.</div>
       <form id="accForm" class="prof" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end">
         <label>Login ID<br><input id="aId" required pattern="[a-z0-9-]{3,30}" placeholder="e.g. vol-reception" style="width:100%;padding:9px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text)"></label>
         <label>Password<br><span style="display:flex;gap:6px"><input id="aPw" required minlength="8" style="flex:1;min-width:0;padding:9px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text)"><button type="button" class="btn small" id="aGen">New</button></span></label>
@@ -1124,8 +1125,8 @@ function accPane() {
 // login, editing any judge's scores and clearing test data.
 // slides: the console login, which builds the results slides. It sees only the certificate list
 // and the Rolling Trophy, and can change nothing.
-function resultsView(isAdmin, certsOnly, isDirector, slides) {
-  $('#whoName').textContent = slides ? 'Results slides' : isDirector ? 'Director' : isAdmin ? 'Admin' : certsOnly ? 'Event coordinator' : 'Results Room'; $('#whoRole').textContent = slides ? 'Certificate list · Rolling Trophy' : certsOnly ? 'Places · certificate writing' : 'Live scores · certificate writing';
+function resultsView(isAdmin, certsOnly, isDirector, slides, viewer) {
+  $('#whoName').textContent = slides ? 'Results slides' : viewer ? 'Admin' : isDirector ? 'Director' : isAdmin ? 'Admin' : certsOnly ? 'Event coordinator' : 'Results Room'; $('#whoRole').textContent = slides ? 'Certificate list · Rolling Trophy' : certsOnly ? 'Places · certificate writing' : 'Live scores · certificate writing';
   let tab = slides ? 'cl' : DATA.events[0].id, scores = [], status = [], certs = [], editingJ = null, cks = [], pinsOpen = false, A = {};
   const rowsOf = E => E.teams.map(t => ({ ...t, ...teamScore(E.id, t.no, scores) }));
   const render = () => { if (editingJ || (tab === 'pins' && document.querySelector('.slips')) || (tab === 'acc' && document.querySelector('#accForm')) || (tab === 'wipe' && document.querySelector('#wipeBox'))) return;
@@ -1146,7 +1147,7 @@ function resultsView(isAdmin, certsOnly, isDirector, slides) {
         <button class="tab" role="tab" data-t="rt" aria-selected="${tab === 'rt'}">Rolling Trophy <em class="${DATA.events.every(e => fin(e.id)) ? 'fin' : ''}">${DATA.events.filter(e => fin(e.id)).length}/4</em></button></div>
       <div id="pane"></div>`}`;
     document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; $('#pane').innerHTML = ''; render(); });
-    if (tab === 'ci' && !certsOnly) { $('#pane').innerHTML = boardHTML(cks, true, A); wireMarks($('#pane')); return; }
+    if (tab === 'ci' && !certsOnly) { $('#pane').innerHTML = boardHTML(cks, !viewer, A); if (!viewer) wireMarks($('#pane')); return; }
     if (tab === 'att') { $('#pane').innerHTML = attBar(attCounts(A)) + attHTML(A, { canMark: isAdmin, group: 'event' }); if (isAdmin) wireAtt($('#pane'), A, 'admin'); return; }
     if (tab === 'cl') { $('#pane').innerHTML = `<div class="banner" style="border-color:var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <span>Participation certificates: only students marked <b>Present</b>, with the name as corrected at the desk. ${attCounts(A).P} certificates.</span>
@@ -1170,7 +1171,7 @@ function resultsView(isAdmin, certsOnly, isDirector, slides) {
       return g.map(x => { const id = `${E.id}_${x.no}`, w = !!certs.find(c => c.id === id && c.done);
         return `<div class="pod p${p}${w ? ' writ' : ''}"><div class="pl">${['1ST', '2ND', '3RD'][p - 1]}</div>${certsOnly ? '' : `<span class="score">${x.avg}</span>`}
           <b>${esc(x.team)} <span class="s">· ${x.no}</span></b><div class="s">${esc(x.school)}</div><div class="mem">${roster(TEAMS[x.no]).map(r => stOf(r, A) === 'A' ? `<s>${esc(who(r, A))}</s> (absent)` : esc(who(r, A))).join('<br>')}</div>
-          <label><input type="checkbox" data-cert="${id}" ${w ? 'checked' : ''} ${isFin ? '' : 'disabled'}> Certificates written</label></div>`; }).join(''); }).join('');
+          ${viewer ? `<div class="s">${w ? '✓ Certificates written' : 'Certificates not written yet'}</div>` : `<label><input type="checkbox" data-cert="${id}" ${w ? 'checked' : ''} ${isFin ? '' : 'disabled'}> Certificates written</label>`}</div>`; }).join(''); }).join('');
     const jst = J.map(j => { const f = status.find(s => s.id === j.id && s.final);
       return `<span class="stc ${f ? 'P' : ''}">${esc(j.label.split(' · ')[0])}: ${f ? 'SUBMITTED' : 'JUDGING'}</span>${isAdmin && f ? ` <button class="btn small" data-unlock="${j.id}">Unlock</button>` : ''}`; }).join(' &nbsp; ');
     $('#pane').innerHTML = `
