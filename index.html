@@ -460,8 +460,16 @@
 
   .site-nav {
     display: flex;
-    gap: 1.6rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.7rem 1.6rem;
   }
+
+  /* Sections of this page, then the two event-day pages. The groups wrap as
+     whole units, so on a phone the pages drop to their own line. */
+  .site-nav__group { display: flex; gap: inherit; }
+  .site-nav .site-nav__group--apps a { color: var(--accent); }
+  .site-nav .site-nav__group--apps a:hover { color: var(--accent-hot); }
 
   .site-nav a {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -591,8 +599,8 @@
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
 
-  /* Event-day tools. Polaris is for everyone on campus, so it gets the
-     filled button; Starbase is for teams, judges and staff. */
+  /* Event-day tools. The School Map is for everyone on campus, so it gets
+     the filled button; Check-in & Judging is for teams, judges and staff. */
   /* Date pill and the two buttons share one row on desktop so the hero
      gains no height; they wrap underneath on narrow screens. */
   .hero__meta {
@@ -1088,6 +1096,7 @@
 
     .site-header { padding: 1.2rem 6%; }
     .site-nav a { font-size: 0.6rem; letter-spacing: 0.12em; }
+    .site-nav { row-gap: 0.45rem; }
     .hero__foot-row { flex-direction: column; gap: 0.8rem; align-items: flex-start; }
 
     /* Full-width portraits stack into a ~1300px scroll for three people.
@@ -1145,9 +1154,15 @@
 <header class="site-header">
   <a class="site-header__mark logo-mark" href="#top" data-scroll><span class="sr-only">NMS AstroNexus — back to top</span><span class="mars" aria-hidden="true"></span><span class="wordmark" aria-hidden="true"></span><span class="rocket-shadow" aria-hidden="true"></span><span class="rocket" aria-hidden="true"></span></a>
   <nav class="site-nav" aria-label="Sections">
-    <a class="wipe" href="#about" data-scroll>About</a>
-    <a class="wipe" href="#events" data-scroll>Events</a>
-    <a class="wipe" href="#organizers" data-scroll>Organizers</a>
+    <span class="site-nav__group">
+      <a class="wipe" href="#about" data-scroll>About</a>
+      <a class="wipe" href="#events" data-scroll>Events</a>
+      <a class="wipe" href="#organizers" data-scroll>Organizers</a>
+    </span>
+    <span class="site-nav__group site-nav__group--apps">
+      <a class="wipe" href="polaris.html">School Map</a>
+      <a class="wipe" href="starbase.html">Check-in &amp; Judging</a>
+    </span>
   </nav>
 </header>
 
@@ -1184,8 +1199,8 @@
     <span class="hero__status" data-reveal="fadeUp" data-reveal-delay="0.35">Thursday, 5 November 2026 &middot; 8:30 AM &ndash; 1:30 PM</span>
 
     <nav class="hero__apps" aria-label="Event-day tools" data-reveal="fadeUp" data-reveal-delay="0.42">
-      <a class="hero__app hero__app--primary" href="polaris.html">Campus map <span class="hero__app-name">Polaris</span><span class="arrow" aria-hidden="true">&rarr;</span></a>
-      <a class="hero__app" href="starbase.html">Check-in &amp; judging <span class="hero__app-name">Starbase</span><span class="arrow" aria-hidden="true">&rarr;</span></a>
+      <a class="hero__app hero__app--primary" href="polaris.html">School Map <span class="arrow" aria-hidden="true">&rarr;</span></a>
+      <a class="hero__app" href="starbase.html">Check-in &amp; Judging <span class="arrow" aria-hidden="true">&rarr;</span></a>
     </nav>
     </div>
 
