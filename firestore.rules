@@ -1,19 +1,24 @@
 rules_version = '2';
-// starbase.nexus (AstroNexus 2026): paste into Firebase console > Firestore Database > Rules > Publish
+// Check-in & Judging (AstroNexus 2026): paste into Firebase console > Firestore Database > Rules > Publish
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null && request.auth.token.email.matches('.*@starbase[.]astronexus26[.]app'); }
+    function authed() { return request.auth != null && request.auth.token.email.matches('.*@starbase[.]astronexus26[.]app'); }
     function me() { return request.auth.token.email.split('@')[0]; }
+    // The director can lock any other login: while locks/<login id> exists, that login can read and write nothing.
+    function signedIn() { return authed() && (me() == 'director' || !exists(/databases/$(database)/documents/locks/$(me()))); }
     // 8 judges, 2 per event: judge1-2 HelioScale, judge3-4 LaunchX, judge5-6 TerraFab, judge7-8 Lost in Orbit
     function JEV() { return {'judge1': 'helioscale', 'judge2': 'helioscale', 'judge3': 'launchx', 'judge4': 'launchx',
                              'judge5': 'terrafab', 'judge6': 'terrafab', 'judge7': 'lostinorbit', 'judge8': 'lostinorbit'}; }
     function judge() { return signedIn() && me() in JEV(); }
-    function myEv() { return JEV()[me()]; }
     // logins created in the Staff logins tab: accounts/<login id> = { role, ev, disabled }
     function acct() { return get(/databases/$(database)/documents/accounts/$(me())).data; }
     function hasAcct() { return signedIn() && exists(/databases/$(database)/documents/accounts/$(me())) && acct().get('disabled', false) != true; }
     function arole() { return hasAcct() ? acct().role : ''; }
-    function staff() { return signedIn() && (me() in ['results1', 'results2', 'admin'] || arole() == 'results'); }
+    // director: everything admin has, plus team PINs, staff logins, locks, editing any score and clearing test data
+    function director() { return signedIn() && me() == 'director'; }
+    // admin-level powers (unlock a judge, mark any attendance); the director has all of them too
+    function admin() { return signedIn() && me() in ['admin', 'director']; }
+    function staff() { return signedIn() && (me() in ['results1', 'results2', 'admin', 'director'] || arole() == 'results'); }
     // event coordinators write certificates: they need the scores to rank teams (the page shows them
     // places only), the certificate ticks, and attendance for the participation list
     function coord() { return signedIn() && (me() in ['coordinator1', 'coordinator2', 'coordinator3', 'coordinator4'] || arole() == 'coordinator'); }
@@ -22,37 +27,40 @@ service cloud.firestore {
     function headFor(ev) { return heads() && (me() == 'logistics' || arole() == 'logistics' || {'helioscale': 'helioscale', 'launchx': 'launchx', 'terrafab': 'terrafab', 'lostinorbit': 'lostinorbit'}.get(me(), '') == ev
                                           || (arole() == 'head' && acct().ev == ev)); }
     function core() { return signedIn() && (me() == 'core' || arole() == 'core'); }
-    function admin() { return signedIn() && me() == 'admin'; }
     function desk() { return signedIn() && (me() == 'volunteers' || arole() == 'volunteers'); }
-    function isFinal(ev) {
-      return exists(/databases/$(database)/documents/status/$(ev))
-        && get(/databases/$(database)/documents/status/$(ev)).data.final == true;
+    function isFinal(jid) {
+      return exists(/databases/$(database)/documents/status/$(jid))
+        && get(/databases/$(database)/documents/status/$(jid)).data.final == true;
     }
     function okScore(v) { return v == null || (v is int && v >= 0 && v <= 30); }
 
     function c(k) { return request.resource.data.get(k, null); }
+    // a well-formed score document for judge j on this document id
+    function scoreDoc(j, id) {
+      return request.resource.data.judge == j
+        && request.resource.data.event == JEV()[j]
+        && id == j + '_' + request.resource.data.no
+        && okScore(c('c1')) && okScore(c('c2')) && okScore(c('c3')) && okScore(c('c4'))
+        && (JEV()[j] != 'terrafab' || c('c4') == null || c('c4') <= 10)
+        && request.resource.data.comment is string && request.resource.data.comment.size() <= 300;
+    }
     // One document per judge per team: <judge id>_<team no>, e.g. judge1_HS-03. Levels 0-30; TerraFab c4 (Critics' Choice) 0-10
     match /scores/{id} {
       allow read: if staff() || coord() || (judge() && resource.data.judge == me());
-      allow create, update: if judge()
-        && request.resource.data.judge == me()
-        && request.resource.data.event == myEv()
-        && id == me() + '_' + request.resource.data.no
-        && !isFinal(me())
-        && okScore(c('c1')) && okScore(c('c2')) && okScore(c('c3')) && okScore(c('c4'))
-        && (myEv() != 'terrafab' || c('c4') == null || c('c4') <= 10)
-        && request.resource.data.comment is string && request.resource.data.comment.size() <= 300;
-      allow delete: if false;
+      allow create, update: if (judge() && scoreDoc(me(), id) && !isFinal(me()))
+        // the director can enter or correct any judge's scores, even after that judge submits
+        || (director() && request.resource.data.judge in JEV() && scoreDoc(request.resource.data.judge, id));
+      allow delete: if director();
     }
-    // status/<judge id>: { final: true } once that judge submits; only admin can unlock. An event is final when both its judges have submitted.
+    // status/<judge id>: { final: true } once that judge submits; admin or the director can unlock. An event is final when both its judges have submitted.
     match /status/{jid} {
       allow read: if signedIn();
       allow write: if (judge() && jid == me() && request.resource.data.final == true)
                    || admin();
     }
-    // pins/<team no>: { pin } — secret 4-digit team PINs, created and read by admin only
+    // pins/<team no>: { pin } — secret 4-digit team PINs, created and read by the director only
     match /pins/{team} {
-      allow read, write: if admin();
+      allow read, write: if director();
     }
     // checkins/<team no>_<venue>: written when a team scans a venue QR and enters its Team ID + PIN
     match /checkins/{id} {
@@ -67,16 +75,22 @@ service cloud.firestore {
     // attendance/<team no>_<i>: roll call. Marked at the registration desk (or by event heads at a venue); read by event heads and the results room
     match /attendance/{id} {
       allow read: if staff() || coord() || heads() || desk() || core();
-      allow write: if (desk() || admin() || headFor(request.resource.data.event))
+      allow create, update: if (desk() || admin() || headFor(request.resource.data.event))
         && request.resource.data.event in ['helioscale', 'launchx', 'terrafab', 'lostinorbit']
         && id == request.resource.data.team + '_' + string(request.resource.data.i)
         && (!('st' in request.resource.data) || request.resource.data.st in ['P', 'A', null])
         && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 80));
+      allow delete: if director();
     }
-    // accounts/<login id>: created and edited by admin; each signed-in user can read their own (to find their role)
+    // accounts/<login id>: created and edited by the director; each signed-in user can read their own (to find their role)
     match /accounts/{id} {
-      allow read: if admin() || (signedIn() && id == me());
-      allow write: if admin();
+      allow read: if director() || (signedIn() && id == me());
+      allow write: if director();
+    }
+    // locks/<login id>: present while the director has locked that login. A locked login may still read its own lock, to say why.
+    match /locks/{id} {
+      allow read: if director() || (authed() && id == me());
+      allow write: if director() && id != 'director';
     }
     // certs/<event>_<team no>: { done } ticked by the certificate writers
     match /certs/{id} {

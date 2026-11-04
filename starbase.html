@@ -392,7 +392,8 @@ const ROLE = {
   coordinator3: { kind: 'certs', grp: 'Event coordinators', label: 'Coordinator 3 · certificates' },
   coordinator4: { kind: 'certs', grp: 'Event coordinators', label: 'Coordinator 4 · certificates' },
   core:        { kind: 'core', grp: 'Teams', label: 'Core team & teachers' },
-  admin:       { kind: 'admin', grp: 'Teams', label: 'Admin (Sriram)' },
+  director:    { kind: 'admin', super: true, grp: 'Teams', label: 'Director' },
+  admin:       { kind: 'admin', grp: 'Teams', label: 'Admin' },
 };
 const MAX = 30;
 const WAYFINDER_URL = 'polaris.html';            // link to the campus map page on your site
@@ -512,6 +513,8 @@ if (firebaseConfig.apiKey) {
     createLogin: async (id, pw) => { const app2 = initializeApp(firebaseConfig, 'creator-' + Date.now()), a2 = A.getAuth(app2);
       await A.createUserWithEmailAndPassword(a2, `${id}@${EMAIL_DOMAIN}`, pw); await A.signOut(a2); },
     save: (col, id, data) => F.setDoc(F.doc(db, col, id), { ...data, updatedAt: F.serverTimestamp() }, { merge: true }),
+    del: (col, id) => F.deleteDoc(F.doc(db, col, id)),
+    list: async col => (await F.getDocs(F.collection(db, col))).docs.map(d => d.id),
     watch: (col, cb, ev) => F.onSnapshot(ev ? F.query(F.collection(db, col), F.where(ev.f || 'event', '==', ev.v || ev)) : F.collection(db, col), { includeMetadataChanges: true },
       s => cb(s.docs.map(d => ({ id: d.id, ...d.data(), _pending: d.metadata.hasPendingWrites })), s.metadata.fromCache)),
   };
@@ -539,6 +542,8 @@ if (firebaseConfig.apiKey) {
     createLogin: async (id, pw) => { const d = read(); d.logins ??= {}; if (ROLES.includes(id) || d.logins[id]) throw new Error('auth/email-already-in-use'); d.logins[id] = pw; write(d); },
     checkPin: (team, pin) => { const p = (read().pins || {})[team]; return !!p && p.pin === pin; },
     save: async (col, id, data) => { const d = read(); d[col] ??= {}; d[col][id] = { ...(d[col][id] || {}), ...data, updatedAt: Date.now() }; write(d); bc && bc.postMessage(1); emit(); },
+    del: async (col, id) => { const d = read(); if (d[col]) delete d[col][id]; write(d); bc && bc.postMessage(1); emit(); },
+    list: async col => Object.keys(read()[col] || {}),
     watch: (col, cb, ev) => { const f = () => cb(Object.entries(read()[col] || {}).map(([id, v]) => ({ id, ...v })).filter(x => !ev || x[ev.f || 'event'] === (ev.v || ev)), false); subs.add(f); f(); return () => subs.delete(f); },
   };
 }
@@ -594,6 +599,7 @@ api.onUser(user => {
   $('#vLogin').hidden = !!user; $('#vApp').hidden = !user;
   if (!user) return;
   net();
+  const go = () => {
   if (!ROLE[user]) {   // a login created from the Logins tab: its role is stored in accounts/<login id>
     $('#main').innerHTML = '<div class="empty">Loading…</div>';
     api.getDoc('accounts', user).then(a => { const R = acctRole(a); if (R) { ROLE[user] = R; route(user, R); } else $('#main').innerHTML = '<div class="empty">This login has no role. Ask the AstroNexus team.</div>'; })
@@ -601,6 +607,14 @@ api.onUser(user => {
     return;
   }
   route(user, ROLE[user]);
+  };
+  // The director can lock any other login; the database refuses a locked login everything anyway,
+  // this just says why instead of showing empty screens.
+  if (user === 'director') return go();
+  $('#main').innerHTML = '<div class="empty">Loading…</div>';
+  api.getDoc('locks', user).then(l => { if (!l) return go();
+    $('#whoName').textContent = user; $('#whoRole').textContent = 'Locked';
+    $('#main').innerHTML = '<div class="empty">This login has been locked by the director. Ask the AstroNexus team.</div>'; }).catch(go);
 });
 const ACCT_ROLES = { volunteers: 'Volunteers · registration roll call', head: 'Event heads (one event)', logistics: 'Team Logistics (all events)', results: 'Results room', coordinator: 'Event coordinators (certificates)', core: 'Core team & teachers (view only)' };
 function acctRole(a) {
@@ -612,7 +626,7 @@ function acctRole(a) {
 function route(user, R) {
   window.anxFX && anxFX(R.kind === 'judge' ? .5 : 1);
   if (R.kind === 'judge') judgeView(EV[R.ev], user, R);
-  else if (R.kind === 'results' || R.kind === 'admin' || R.kind === 'certs') resultsView(R.kind === 'admin', R.kind === 'certs');
+  else if (R.kind === 'results' || R.kind === 'admin' || R.kind === 'certs') resultsView(R.kind === 'admin', R.kind === 'certs', !!R.super);
   else if (R.kind === 'head') checkinView(R.ev, R.label);
   else if (R.kind === 'desk') deskView();
   else if (R.kind === 'core') coreView();
@@ -641,9 +655,10 @@ const finCount = (ev, status) => judgesOf(ev).filter(j => status.find(s => s.id 
 const time = t => { const d = t?.toDate ? t.toDate() : t ? new Date(t) : null; return d ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''; };
 
 /* ---------------- JUDGE ---------------- */
-function judgeView(E, me, R) {
+// override: the director editing this judge's scores. Submitting doesn't lock them out, and there's a way back.
+function judgeView(E, me, R, override) {
   const C = RUB[E.id], MX = EMAX(E.id);
-  $('#whoName').textContent = R.label; $('#whoRole').textContent = E.name;
+  $('#whoName').textContent = override ? 'Director' : R.label; $('#whoRole').textContent = override ? 'Editing ' + R.label : E.name;
   const S = {}; let final = false;
   const seg = (t, c, i) => c.lv
     ? `<div class="lv" data-c="c${i + 1}">${c.lv.map(v => `<button type="button" data-v="${v}">${v}</button>`).join('')}</div>`
@@ -654,7 +669,8 @@ function judgeView(E, me, R) {
       <div class="prog"><small id="pTxt"></small><div class="bar"><i id="pBar" style="width:0"></i></div><small class="mono" style="font-size:10px">Total per team out of ${MX}</small>
         <div style="margin-top:10px">${scanBtn('bScan', 'Scan paper score sheet')}</div></div></div>
     <div class="rub">${C.map((c, i) => `<div><span class="mono">Criterion ${i + 1} · /${cmax(c)}${c.opt ? ' · optional' : ''}</span><b style="display:block;margin:2px 0 4px">${esc(c.n)}</b><small style="color:var(--muted);line-height:1.45">${esc(c.d)}</small></div>`).join('')}</div>
-    <div class="banner done" id="finBan" hidden>✓ Your final scores are submitted to the results room. Ask the AstroNexus team if you need to change anything.</div>
+    ${override ? `<div class="banner" style="border-color:var(--gold);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>You're editing <b>${esc(R.label)}</b>'s scores as director. Changes save straight away.</span><button class="btn small" style="width:auto" id="bBack">← Back to results</button></div>` : ''}
+    <div class="banner done" id="finBan" hidden>✓ ${override ? 'This judge has submitted. As director you can still change these scores.' : 'Your final scores are submitted to the results room. Ask the AstroNexus team if you need to change anything.'}</div>
     <div class="teams">${E.teams.map(t => `
       <div class="team" data-no="${t.no}">
         <div class="no">${t.no}<small>${esc(t.slot)}</small></div>
@@ -674,7 +690,7 @@ function judgeView(E, me, R) {
     d.comment = el.querySelector('textarea').value.slice(0, 300); return d; };
   document.querySelectorAll('.team').forEach(el => {
     const no = el.dataset.no;
-    el.querySelectorAll('.lv button').forEach(b => b.onclick = () => { if (final) return; const was = b.classList.contains('on');
+    el.querySelectorAll('.lv button').forEach(b => b.onclick = () => { if (final && !override) return; const was = b.classList.contains('on');
       b.parentElement.querySelectorAll('button').forEach(x => x.classList.remove('on')); if (!was) b.classList.add('on'); queue(no); });
     el.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => { inp.value = inp.value.replace(/\D/g, '').slice(0, 2);
       const c = C[+inp.dataset.c.slice(1) - 1]; inp.classList.toggle('badv', inp.value !== '' && +inp.value > c.max); queue(no); }));
@@ -710,9 +726,11 @@ function judgeView(E, me, R) {
   unsub.push(api.watch('status', docs => {
     final = !!docs.find(d => d.id === me && d.final);
     $('#finBan').hidden = !final; $('#bFinal').disabled = final; $('#bFinal').textContent = final ? 'Submitted ✓' : 'Submit final scores';
-    document.querySelectorAll('.team input, .team textarea, .team .lv button').forEach(i => i.disabled = final); progress();
+    $('#bFinal').hidden = !!override;
+    document.querySelectorAll('.team input, .team textarea, .team .lv button').forEach(i => i.disabled = final && !override); progress();
   }));
-  $('#bScan').onclick = () => { if (final) return alert('Your scores are already submitted.');
+  if (override) $('#bBack').onclick = () => { unsub.forEach(f => f && f()); unsub = []; resultsView(true, false, true); };
+  $('#bScan').onclick = () => { if (final && !override) return alert('Your scores are already submitted.');
     scanDialog({ type: 'score', judge: me }, (no, d) => api.save('scores', `${me}_${no}`, { event: E.id, judge: me, no, ...d, comment: (S[no] && S[no].comment) || '' })); };
   $('#bFinal').onclick = async () => {
     const missing = E.teams.filter(t => total(S[t.no]) === null).map(t => t.no);
@@ -1027,7 +1045,7 @@ function checkinView(only, label) {
   unsub.push(api.watch('attendance', d => { A = attMap(d); render(); }));
 }
 function pinsPane(isAdmin) {
-  if (!isAdmin) { $('#pane').innerHTML = '<div class="empty">Only admin can see team PINs.</div>'; return; }
+  if (!isAdmin) { $('#pane').innerHTML = '<div class="empty">Only the director can see team PINs.</div>'; return; }
   const host = $('#pane'); host.innerHTML = '<div class="empty">Loading…</div>';
   pinsPane.u && pinsPane.u();
   pinsPane.u = api.watch('pins', d => { if (!document.body.contains(host)) return;
@@ -1049,12 +1067,12 @@ function pinsPane(isAdmin) {
 }
 
 function accPane() {
-  const host = $('#pane'); let list = [], msgHTML = '';
+  const host = $('#pane'); let list = [], msgHTML = '', locks = [];
   const pw = () => { const w = ['Comet', 'Nebula', 'Quasar', 'Pulsar', 'Zenith', 'Aurora', 'Photon', 'Meteor', 'Galaxy', 'Rocket', 'Lunar', 'Solar', 'Orbit', 'Vega'], r = n => crypto.getRandomValues(new Uint32Array(1))[0] % n;
     return `${w[r(w.length)]}-${w[r(w.length)]}-${1000 + r(9000)}`; };
   const draw = () => {
     host.innerHTML = `<div class="banner" style="border-color:var(--line)">Create a login for anyone who needs Check-in &amp; Judging. A login can be used on many devices at the same time, so a whole team can share one.
-      The 22 ready-made logins (judges, event heads, logistics, volunteers, results room, coordinators, core, admin) keep working as they are.</div>
+      The 23 ready-made logins (judges, event heads, logistics, volunteers, results room, coordinators, core, admin, director) are listed below.</div>
       <form id="accForm" class="prof" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end">
         <label>Login ID<br><input id="aId" required pattern="[a-z0-9-]{3,30}" placeholder="e.g. vol-reception" style="width:100%;padding:9px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text)"></label>
         <label>Password<br><span style="display:flex;gap:6px"><input id="aPw" required minlength="8" style="flex:1;min-width:0;padding:9px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text)"><button type="button" class="btn small" id="aGen">New</button></span></label>
@@ -1067,7 +1085,13 @@ function accPane() {
       ${list.length ? list.sort((a, b) => a.id.localeCompare(b.id)).map(a => `<tr style="${a.disabled ? 'opacity:.45' : ''}"><td><b>${esc(a.id)}</b></td><td>${esc(ACCT_ROLES[a.role] || a.role)}${a.ev ? ' · ' + esc(EV[a.ev].name) : ''}</td><td>${esc(a.label || '')}</td>
         <td class="note">${a.created ? new Date(a.created).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</td>
         <td><button class="btn small" data-dis="${esc(a.id)}" data-v="${a.disabled ? 0 : 1}">${a.disabled ? 'Turn on' : 'Turn off'}</button></td></tr>`).join('') : '<tr><td colspan="5" class="note">No extra logins yet.</td></tr>'}</tbody></table>
-      <p class="note">Passwords are shown only once, when you create the login: write them down or send them privately. "Turn off" removes the login's access straight away.</p>`;
+      <p class="note">Passwords are shown only once, when you create the login: write them down or send them privately. "Turn off" removes the login's access straight away.</p>
+      <h3 style="margin:22px 0 6px;font-size:15px">Ready-made logins</h3>
+      <p class="note" style="margin-top:0">Lock a login to shut it out straight away, on every device. It can still sign in, but sees nothing and can change nothing until you unlock it.</p>
+      <table class="res"><thead><tr><th>Login ID</th><th>Who</th><th>Status</th><th></th></tr></thead><tbody>
+      ${Object.entries(ROLE).filter(([id]) => id !== 'director').map(([id, r]) => { const L = locks.includes(id);
+        return `<tr style="${L ? 'opacity:.6' : ''}"><td><b>${esc(id)}</b></td><td>${esc(r.label)}</td><td>${L ? '<span style="color:var(--bad)">Locked</span>' : 'Active'}</td>
+          <td><button class="btn small" data-lock="${esc(id)}" data-v="${L ? 0 : 1}">${L ? 'Unlock' : 'Lock'}</button></td></tr>`; }).join('')}</tbody></table>`;
     const f = $('#accForm'), role = $('#aRole');
     role.onchange = () => { $('#aEvL').hidden = role.value !== 'head'; }; $('#aGen').onclick = () => { $('#aPw').value = pw(); }; $('#aPw').value = pw();
     f.onsubmit = async e => { e.preventDefault(); const id = $('#aId').value.trim().toLowerCase(), p = $('#aPw').value, msg = { set innerHTML(v) { msgHTML = v; const m = $('#aMsg'); if (m) m.innerHTML = v; }, set textContent(v) { this.innerHTML = esc(v); } };
@@ -1078,20 +1102,29 @@ function accPane() {
         msg.innerHTML = `<span style="color:var(--ok)">✓ Created. Login ID <b>${esc(id)}</b> · password <b>${esc(p)}</b> (write it down now).</span>`; f.reset(); $('#aPw').value = pw(); $('#aEvL').hidden = true;
       } catch (er) { const c = er.code || er.message || ''; msg.innerHTML = `<span style="color:var(--bad)">${/already/.test(c) ? 'That login ID already exists.' : /weak/.test(c) ? 'Password is too weak (use at least 8 characters).' : 'Could not create the login: ' + esc(c)}</span>`; } };
     host.querySelectorAll('[data-dis]').forEach(b => b.onclick = () => api.save('accounts', b.dataset.dis, { disabled: b.dataset.v === '1' }));
+    host.querySelectorAll('[data-lock]').forEach(b => b.onclick = () => { const id = b.dataset.lock;
+      if (b.dataset.v === '1') { if (confirm(`Lock ${id}? Anyone using it is shut out straight away.`)) api.save('locks', id, { locked: true, at: Date.now() }); }
+      else api.del('locks', id); });
   };
   accPane.u && accPane.u();
-  accPane.u = api.watch('accounts', d => { list = d; const keep = $('#aId') ? [$('#aId').value, $('#aPw').value] : null; draw();
+  // these keep listening after you switch tabs, so only redraw while this pane is on screen
+  accPane.u = api.watch('accounts', d => { list = d; if (!document.body.contains(host)) return; const keep = $('#aId') ? [$('#aId').value, $('#aPw').value] : null; draw();
     if (keep) { $('#aId').value = keep[0]; $('#aPw').value = keep[1]; } });
-  unsub.push(() => accPane.u && accPane.u());
+  accPane.l && accPane.l();
+  accPane.l = api.watch('locks', d => { locks = d.map(x => x.id); if (!document.body.contains(host)) return; const keep = $('#aId') ? [$('#aId').value, $('#aPw').value] : null; draw();
+    if (keep) { $('#aId').value = keep[0]; $('#aPw').value = keep[1]; } });
+  unsub.push(() => accPane.u && accPane.u(), () => accPane.l && accPane.l());
 }
 
 // certsOnly: event coordinators. They see places, podiums and the certificate list for
 // every event, but not the judges' scores, averages or notes.
-function resultsView(isAdmin, certsOnly) {
-  $('#whoName').textContent = isAdmin ? 'Admin' : certsOnly ? 'Event coordinator' : 'Results Room'; $('#whoRole').textContent = certsOnly ? 'Places · certificate writing' : 'Live scores · certificate writing';
+// isDirector: the director has everything admin has, plus team PINs, staff logins, locking any
+// login, editing any judge's scores and clearing test data.
+function resultsView(isAdmin, certsOnly, isDirector) {
+  $('#whoName').textContent = isDirector ? 'Director' : isAdmin ? 'Admin' : certsOnly ? 'Event coordinator' : 'Results Room'; $('#whoRole').textContent = certsOnly ? 'Places · certificate writing' : 'Live scores · certificate writing';
   let tab = DATA.events[0].id, scores = [], status = [], certs = [], editingJ = null, cks = [], pinsOpen = false, A = {};
   const rowsOf = E => E.teams.map(t => ({ ...t, ...teamScore(E.id, t.no, scores) }));
-  const render = () => { if (editingJ || (tab === 'pins' && document.querySelector('.slips')) || (tab === 'acc' && document.querySelector('#accForm'))) return;
+  const render = () => { if (editingJ || (tab === 'pins' && document.querySelector('.slips')) || (tab === 'acc' && document.querySelector('#accForm')) || (tab === 'wipe' && document.querySelector('#wipeBox'))) return;
     const byEv = id => scores.filter(s => s.event === id), fin = id => evFinal(id, status);
     $('#main').innerHTML = `
       <div class="hero"><div><p class="mono" style="color:var(--sand);font-size:11px;margin:0 0 4px">${certsOnly ? 'Event coordinators' : 'Results room'} · live</p><h2>${certsOnly ? 'Certificates' : 'Scores &amp; Winners'}</h2>
@@ -1102,7 +1135,8 @@ function resultsView(isAdmin, certsOnly) {
         <button class="tab" role="tab" data-t="att" aria-selected="${tab === 'att'}">Attendance <em>${attCounts(A).P}/${ALLS.length}</em></button>
         <button class="tab" role="tab" data-t="cl" aria-selected="${tab === 'cl'}">Certificate list</button>
         ${certsOnly ? '' : `<button class="tab" role="tab" data-t="ci" aria-selected="${tab === 'ci'}">Check-in <em>${new Set(cks.filter(c => c.venue === 'reg').map(c => c.team)).size}/${Object.keys(TEAMS).length}</em></button>`}
-        ${isAdmin ? `<button class="tab" role="tab" data-t="pins" aria-selected="${tab === 'pins'}">Team logins</button><button class="tab" role="tab" data-t="acc" aria-selected="${tab === 'acc'}">Staff logins</button>` : ''}
+        ${isDirector ? `<button class="tab" role="tab" data-t="pins" aria-selected="${tab === 'pins'}">Team logins</button><button class="tab" role="tab" data-t="acc" aria-selected="${tab === 'acc'}">Staff logins</button>
+          <button class="tab" role="tab" data-t="edit" aria-selected="${tab === 'edit'}">Edit scores</button><button class="tab" role="tab" data-t="wipe" aria-selected="${tab === 'wipe'}">Clear test data</button>` : ''}
         <button class="tab" role="tab" data-t="rt" aria-selected="${tab === 'rt'}">Rolling Trophy <em class="${DATA.events.every(e => fin(e.id)) ? 'fin' : ''}">${DATA.events.filter(e => fin(e.id)).length}/4</em></button></div>
       <div id="pane"></div>`;
     document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { tab = b.dataset.t; $('#pane').innerHTML = ''; render(); });
@@ -1111,8 +1145,10 @@ function resultsView(isAdmin, certsOnly) {
     if (tab === 'cl') { $('#pane').innerHTML = `<div class="banner" style="border-color:var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <span>Participation certificates: only students marked <b>Present</b>, with the name as corrected at the desk. ${attCounts(A).P} certificates.</span>
       <button class="btn small" onclick="print()">Print list</button></div>${certListHTML(A)}`; return; }
-    if (tab === 'pins') { pinsPane(isAdmin); return; }
+    if (tab === 'pins') { pinsPane(isDirector); return; }
     if (tab === 'acc') { accPane(); return; }
+    if (tab === 'edit') { editPane(); return; }
+    if (tab === 'wipe') { wipePane(); return; }
     tab === 'rt' ? rtPane(fin) : evPane(EV[tab], fin(tab));
   };
   function ranked(E) {
@@ -1146,6 +1182,29 @@ function resultsView(isAdmin, certsOnly) {
       <p class="note">Each judge's total is out of ${MX} (${C.map(c => `${esc(c.n)} /${cmax(c)}`).join(' · ')}). The team's score is the average of both judges. Hover a judge's score to see the breakdown.</p>`}`;
     $('#pane').querySelectorAll('[data-cert]').forEach(cb => cb.onchange = () => api.save('certs', cb.dataset.cert, { done: cb.checked, event: E.id }));
     $('#pane').querySelectorAll('[data-unlock]').forEach(b => b.onclick = () => confirm(`Let ${b.dataset.unlock} edit scores again?`) && api.save('status', b.dataset.unlock, { final: false }));
+  }
+  function editPane() {
+    $('#pane').innerHTML = `<div class="banner" style="border-color:var(--line)">Open any judge's scoring screen to enter or correct scores, even after they have submitted.
+      Changes save straight away and show in the results room as that judge's scores.</div>
+      ${DATA.events.map(E => `<h3 style="margin:18px 0 8px;font-size:15px">${esc(E.name)}</h3><div style="display:flex;gap:8px;flex-wrap:wrap">${judgesOf(E.id).map(j => {
+        const f = status.find(s => s.id === j.id && s.final);
+        return `<button class="btn small" style="width:auto" data-edit="${j.id}">${esc(j.label)} · ${f ? 'submitted' : 'judging'}</button>`; }).join('')}</div>`).join('')}`;
+    $('#pane').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
+      const jid = b.dataset.edit; unsub.forEach(f => f && f()); unsub = []; judgeView(EV[ROLE[jid].ev], jid, ROLE[jid], true); });
+  }
+  function wipePane() {
+    const COLS = ['scores', 'status', 'certs', 'checkins', 'attendance'];
+    $('#pane').innerHTML = `<div class="banner" id="wipeBox" style="border-color:var(--bad)">
+      <p style="margin:0 0 8px"><b>Clear test data before the event.</b> This deletes every score, every judge's submission, certificate ticks, team check-ins and student attendance.
+      Team PINs, staff logins and locks are kept. This can't be undone.</p>
+      <label>Type <b>CLEAR</b> to confirm<br><input id="wipeIn" autocomplete="off" style="margin-top:6px;padding:9px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text)"></label>
+      <button class="btn small" id="wipeGo" style="width:auto;margin-left:8px" disabled>Delete test data</button><div id="wipeMsg" class="note" style="margin-top:10px"></div></div>`;
+    const inp = $('#wipeIn'), go = $('#wipeGo'), msg = $('#wipeMsg');
+    inp.oninput = () => { go.disabled = inp.value.trim() !== 'CLEAR'; };
+    go.onclick = async () => { go.disabled = true; inp.disabled = true; let n = 0;
+      try { for (const c of COLS) { const ids = await api.list(c); for (const id of ids) { await api.del(c, id); n++; msg.textContent = `Deleted ${n}…`; } }
+        msg.innerHTML = `<span style="color:var(--ok)">✓ Cleared ${n} test records. PINs and logins are untouched.</span>`; }
+      catch (er) { msg.innerHTML = `<span style="color:var(--bad)">Stopped after ${n}: ${esc(er.message || String(er))}</span>`; inp.disabled = false; } };
   }
   function rtPane(fin) {
     const rows = DATA.rt.map(sc => { const per = DATA.events.map(E => { const best = ranked(E).filter(x => x.school === sc && x.avg !== null).map(x => x.avg / EMAX(E.id) * 100);

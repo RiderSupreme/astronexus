@@ -9,7 +9,7 @@ The portal is one file, `starbase.html`, and runs on any static website. Scores 
 4. **Build > Firestore Database > Create database.** Pick the `europe-west` or `me-central` location and start in **production mode**.
 5. **Firestore > Rules:** paste everything from `firestore.rules` and click **Publish**.
 
-## 2. Create the 22 logins
+## 2. Create the 23 logins
 Go to **Authentication > Users > Add user**. The email is the login ID plus `@starbase.astronexus26.app` (no emails are sent there).
 The passwords are in **Starbase Nexus Logins.pdf** (kept outside this folder, do not upload it). Each group shares one login. Judges 1-2 score HelioScale, 3-4 LaunchX, 5-6 TerraFab, 7-8 Lost in Orbit.
 
@@ -36,7 +36,8 @@ The passwords are in **Starbase Nexus Logins.pdf** (kept outside this folder, do
 | `coordinator3` | Event coordinator | Same as `coordinator1` |
 | `coordinator4` | Event coordinator | Same as `coordinator1` |
 | `core` | Core team and NMS teachers on duty | Live overview of all events (view only) |
-| `admin` | Sriram | Everything, plus unlocking scores and creating team PINs |
+| `admin` | Admin | Everything the results room sees, unlock a judge who submitted too early, mark any attendance |
+| `director` | Director (top account) | Everything admin can do, plus team PINs, staff logins, locking any login, editing any judge's scores and clearing test data |
 
 Event heads can only mark students in their own event; the database rules enforce this.
 
