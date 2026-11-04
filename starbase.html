@@ -348,6 +348,13 @@ html:has(#vLogin:not([hidden])) body, html:has(#vCheck:not([hidden])) body { hei
   /* the school picker was as wide as its longest name */
   .attf select, .attf input { min-width: 0; max-width: 100%; }
 }
+
+/* show / hide the typed password or PIN */
+.pwwrap { position: relative; }
+.pwwrap input { padding-right: 72px !important; }
+.pweye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); min-height: 36px; padding: 0 12px; border: 0; border-radius: 9px;
+  background: rgba(255,255,255,.07); color: var(--sand); font: 700 11px 'IBM Plex Mono', monospace; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.pweye[aria-pressed="true"] { background: rgba(255,255,255,.16); }
 </style>
 </head>
 <body>
@@ -362,7 +369,7 @@ html:has(#vLogin:not([hidden])) body, html:has(#vCheck:not([hidden])) body { hei
     <label for="lid">Login ID</label>
     <input id="lid" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="e.g. judge1" required>
     <label for="lpw">Password</label>
-    <input id="lpw" name="password" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" required>
+    <div class="pwwrap"><input id="lpw" name="password" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" required><button type="button" class="pweye" aria-label="Show password" aria-pressed="false">Show</button></div>
     <button class="btn gold" type="submit">Sign in</button>
     <div class="err" id="lerr"></div>
     <div class="demo" id="noJs" style="border-color:rgba(223,191,143,.5)">If nothing happens when you press <b>Sign in</b>, this viewer isn't running the page.
@@ -595,7 +602,7 @@ function teamCheckin(vid) {
   const form = (err = '') => {
     box.innerHTML = `<a class="home-logo" href="index.html" aria-label="AstroNexus home"><img class="logo" src="${$('#vLogin img').src}" alt="AstroNexus"></a><div class="where">Team check-in</div><h1>${esc(V.name)}</h1><div class="fl">${esc(V.where)}</div>
       <form id="ciF"><label for="ciT">Team ID (on your team card, e.g. HS-03)</label><input id="ciT" autocomplete="off" autocapitalize="characters" value="${esc(saved.team || '')}" required>
-      <label for="ciP">Team PIN</label><input id="ciP" inputmode="numeric" pattern="[0-9]*" maxlength="6" type="password" value="${esc(saved.pin || '')}" required>
+      <label for="ciP">Team PIN</label><div class="pwwrap"><input id="ciP" inputmode="numeric" pattern="[0-9]*" maxlength="6" type="password" value="${esc(saved.pin || '')}" required><button type="button" class="pweye" aria-label="Show password" aria-pressed="false">Show</button></div>
       <button class="btn gold" type="submit">Check in here</button><div class="err">${esc(err)}</div></form>
       <p class="note" style="margin-top:14px">Your teacher has your Team ID and PIN. This phone remembers them for your next check-in.</p>`;
     box.querySelector('#ciF').onsubmit = async e => { e.preventDefault();
@@ -1267,6 +1274,17 @@ function resultsView(isAdmin, certsOnly, isDirector, slides, viewer) {
   }
   unsub.push(api.watch('attendance', d => { A = attMap(d); if (tab !== 'pins') render(); }));
 }
+</script>
+<script>
+// show / hide button inside password and PIN boxes (the PIN form is redrawn, so listen on the document)
+document.addEventListener('click', e => {
+  const b = e.target.closest('.pweye'); if (!b) return;
+  const inp = b.parentNode.querySelector('input'), show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  b.textContent = show ? 'Hide' : 'Show';
+  b.setAttribute('aria-pressed', show); b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  inp.focus();
+});
 </script>
 </body>
 </html>
