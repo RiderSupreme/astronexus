@@ -315,6 +315,39 @@ html:has(#vLogin:not([hidden])) body, html:has(#vCheck:not([hidden])) body { hei
 .home-logo:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
 /* the new name is longer than "starbase.nexus", so let it size to the card */
 .lbox h1 { font-size: clamp(22px, 7.4vw, 30px); line-height: 1.15; }
+
+/* ---------- phones ---------- */
+.rubd { margin-bottom: 14px; }
+.rubd > summary { cursor: pointer; list-style: none; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--panel); font: 700 11px 'IBM Plex Mono', monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--sand); }
+.rubd > summary::-webkit-details-marker { display: none; }
+.rubd > summary::after { content: ' ▾'; }
+.rubd[open] > summary { margin-bottom: 10px; }
+.rubd[open] > summary::after { content: ' ▴'; }
+.tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tscroll table.res { min-width: 520px; }
+/* a bare 1fr let the check-in map's SVG push its column past the screen edge */
+@media (max-width: 900px) { .cib { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  /* top bar: logo, status dot, name and sign-out on one line */
+  .top { padding: 10px 12px; gap: 10px; }
+  .top img { height: 32px; }
+  .pill { padding: 7px 8px; }
+  .pill span { display: none; }            /* keep the online/offline dot, drop the word */
+  .top .who { font-size: 12px; min-width: 0; }
+  .top .who b { font-size: 13.5px; line-height: 1.25; }
+  #bOut { white-space: nowrap; }
+  /* everything tappable at least ~40px tall for thumbs */
+  .btn.small { min-height: 40px; padding: 9px 13px; }
+  .seg button { min-height: 42px; }
+  .chip { padding: 9px 9px; font-size: 11px; }
+  .lv button { padding: 12px 0; }
+  .srow .nm button { padding: 10px 6px; margin: -10px 0 -10px 2px; }   /* "change": bigger tap area, same look */
+  .pod label input, input[type=checkbox] { width: 22px; height: 22px; vertical-align: -5px; }
+  .pod label { min-height: 40px; }   /* the whole "Certificates written" line is the tap target */
+  /* the school picker was as wide as its longest name */
+  .attf select, .attf input { min-width: 0; max-width: 100%; }
+}
 </style>
 </head>
 <body>
@@ -671,7 +704,8 @@ function judgeView(E, me, R, override) {
       <p>Tap one level for each criterion. Scores save automatically and go straight to the results room. Each team's final score is the average of both judges.</p></div>
       <div class="prog"><small id="pTxt"></small><div class="bar"><i id="pBar" style="width:0"></i></div><small class="mono" style="font-size:10px">Total per team out of ${MX}</small>
         <div style="margin-top:10px">${scanBtn('bScan', 'Scan paper score sheet')}</div></div></div>
-    <div class="rub">${C.map((c, i) => `<div><span class="mono">Criterion ${i + 1} · /${cmax(c)}${c.opt ? ' · optional' : ''}</span><b style="display:block;margin:2px 0 4px">${esc(c.n)}</b><small style="color:var(--muted);line-height:1.45">${esc(c.d)}</small></div>`).join('')}</div>
+    <details class="rubd"${matchMedia('(max-width: 640px)').matches ? '' : ' open'}><summary>Scoring guide · ${C.length} criteria</summary>
+    <div class="rub">${C.map((c, i) => `<div><span class="mono">Criterion ${i + 1} · /${cmax(c)}${c.opt ? ' · optional' : ''}</span><b style="display:block;margin:2px 0 4px">${esc(c.n)}</b><small style="color:var(--muted);line-height:1.45">${esc(c.d)}</small></div>`).join('')}</div></details>
     ${override ? `<div class="banner" style="border-color:var(--gold);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>You're editing <b>${esc(R.label)}</b>'s scores as director. Changes save straight away.</span><button class="btn small" style="width:auto" id="bBack">← Back to results</button></div>` : ''}
     <div class="banner done" id="finBan" hidden>✓ ${override ? 'This judge has submitted. As director you can still change these scores.' : 'Your final scores are submitted to the results room. Ask the AstroNexus team if you need to change anything.'}</div>
     <div class="teams">${E.teams.map(t => `
@@ -1220,9 +1254,9 @@ function resultsView(isAdmin, certsOnly, isDirector, slides, viewer) {
     const all = DATA.events.every(E => fin(E.id));
     $('#pane').innerHTML = `
       <div class="banner ${all ? 'done' : ''}" style="${all ? '' : 'border-color:var(--line)'}">${all ? '✓ All four events are final. The Rolling Trophy result is confirmed.' : 'Provisional: the Rolling Trophy is confirmed once all four events are FINAL.'}</div>
-      <table class="res"><thead><tr><th>#</th><th>School</th>${DATA.events.map(E => `<th>${esc(E.name)} %</th>`).join('')}<th>Total /400</th></tr></thead>
+      <div class="tscroll"><table class="res"><thead><tr><th>#</th><th>School</th>${DATA.events.map(E => `<th>${esc(E.name)} %</th>`).join('')}<th>Total /400</th></tr></thead>
       <tbody>${rows.map((r, i) => `<tr><td class="big">${i + 1}</td><td><b>${esc(r.sc)}</b>${r.full ? '' : '<div class="tie" style="color:var(--muted)">waiting for scores</div>'}</td>
-        ${r.per.map(v => `<td class="n">${v ?? '–'}</td>`).join('')}<td class="big">${r.sum}</td></tr>`).join('')}</tbody></table>
+        ${r.per.map(v => `<td class="n">${v ?? '–'}</td>`).join('')}<td class="big">${r.sum}</td></tr>`).join('')}</tbody></table></div>
       <p class="note">Events have different totals (HelioScale ${EMAX('helioscale')}, LaunchX ${EMAX('launchx')}, TerraFab ${EMAX('terrafab')}, Lost in Orbit ${EMAX('lostinorbit')}), so each school's best team score in each event is turned into a percentage and the four percentages are added (out of 400). Only the ${DATA.rt.length} schools entered in all four events are eligible.</p>`;
   }
   unsub.push(api.watch('scores', d => { scores = d; render(); }));
