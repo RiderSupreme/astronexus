@@ -394,7 +394,7 @@ const ROLE = {
   core:        { kind: 'core', grp: 'Teams', label: 'Core team & teachers' },
   console:     { kind: 'console', grp: 'Teams', label: 'Results slides' },
   director:    { kind: 'admin', super: true, grp: 'Teams', label: 'Director' },
-  admin2:      { kind: 'viewer', grp: 'Teams', label: 'Admin' },
+  admin2:      { kind: 'viewer', grp: 'Teams', label: 'Secondary Admin' },
 };
 const MAX = 30;
 const WAYFINDER_URL = 'polaris.html';            // link to the campus map page on your site
@@ -1126,7 +1126,7 @@ function accPane() {
 // slides: the console login, which builds the results slides. It sees only the certificate list
 // and the Rolling Trophy, and can change nothing.
 function resultsView(isAdmin, certsOnly, isDirector, slides, viewer) {
-  $('#whoName').textContent = slides ? 'Results slides' : viewer ? 'Admin' : isDirector ? 'Director' : isAdmin ? 'Admin' : certsOnly ? 'Event coordinator' : 'Results Room'; $('#whoRole').textContent = slides ? 'Certificate list · Rolling Trophy' : certsOnly ? 'Places · certificate writing' : 'Live scores · certificate writing';
+  $('#whoName').textContent = slides ? 'Results slides' : viewer ? 'Secondary Admin' : isDirector ? 'Director' : isAdmin ? 'Admin' : certsOnly ? 'Event coordinator' : 'Results Room'; $('#whoRole').textContent = slides ? 'Certificate list · Rolling Trophy' : certsOnly ? 'Places · certificate writing' : 'Live scores · certificate writing';
   let tab = slides ? 'cl' : DATA.events[0].id, scores = [], status = [], certs = [], editingJ = null, cks = [], pinsOpen = false, A = {};
   const rowsOf = E => E.teams.map(t => ({ ...t, ...teamScore(E.id, t.no, scores) }));
   const render = () => { if (editingJ || (tab === 'pins' && document.querySelector('.slips')) || (tab === 'acc' && document.querySelector('#accForm')) || (tab === 'wipe' && document.querySelector('#wipeBox'))) return;
