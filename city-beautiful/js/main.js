@@ -13,6 +13,9 @@ import { Vegetation } from './vegetation.js';
 import { Nav } from './nav.js';
 import { Input } from './input.js';
 import { Player } from './player.js';
+import { Horde } from './zombies.js';
+import { Fx } from './fx.js';
+import { Weapons } from './weapons.js';
 
 const params = new URLSearchParams(location.search);
 const DEV = params.has('dev');
@@ -82,6 +85,11 @@ class Game {
     this.player = new Player(world, camera);
     this.player.spawn(START.x, START.z, START.yaw);
     this.player.fov = this.settings.fov; this.player.sens = this.settings.sens; this.player.invertY = this.settings.invertY;
+    progress(0.88, 'Counting the sleepers');
+    await nextFrame();
+    this.fx = new Fx(this);
+    this.horde = new Horde(this, gfx.qualityName === 'low' ? 40 : 56);
+    this.weapons = new Weapons(this);
     for (const fn of this.hooks.load || []) await fn(this, progress);
     progress(0.95, 'Waiting for the light');
     await nextFrame();
@@ -104,7 +112,13 @@ class Game {
     GU.uTime.value += dt;
     const playing = this.state === 'playing';
     this.jd += (this.clockRate * dt) / 24;
-    if (playing || this.state === 'dead' || this.state === 'won') this.player.update(dt, this.input, playing);
+    const live = playing || this.state === 'dead' || this.state === 'won';
+    if (live) {
+      this.player.update(dt, this.input, playing);
+      this.weapons.update(dt, this.player, this.input, playing);
+      this.horde.update(dt, this.player, this.sky.astro.sunAlt > -0.02);
+    }
+    this.fx.update(dt, this.camera, this.sky);
     for (const fn of this.hooks.update) fn(dt, this);
     const cam = this.camera;
     GU.uCamPos.value.copy(this.player.pos);
