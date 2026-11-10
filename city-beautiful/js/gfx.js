@@ -51,8 +51,8 @@ void main() {
   vec3 col = texture2D(tSrc, vUv).rgb;
   float sky = step(0.999999, depth);
   vec2 d = (vUv - uSun) * vec2(uAspect, 1.0);
-  float near = exp(-dot(d, d) * 5.0);
-  gl_FragColor = vec4(min(col, vec3(7.0)) * sky * near, 1.0);
+  float near = exp(-dot(d, d) * 7.0);
+  gl_FragColor = vec4(min(col, vec3(4.0)) * sky * near, 1.0);
 }`;
 const SHAFT_BLUR_FRAG = /* glsl */`
 uniform sampler2D tSrc; uniform vec2 uSun; uniform float uStep;

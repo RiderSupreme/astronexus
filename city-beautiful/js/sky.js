@@ -517,7 +517,7 @@ export class Sky {
     // --- shafts of light through haze, strongest when the sun is low
     { const m = Math.max(this.lightE.r, this.lightE.g, this.lightE.b, 1e-4);
       this.shaftColor.copy(this.lightE).multiplyScalar(1 / m);
-      this.shaftStrength = this.lightIsMoon ? 0 : 0.2 * sunVis * smoothstep(42 * DEG, 9 * DEG, a.sunAlt) * (0.5 + this.haze); }
+      this.shaftStrength = this.lightIsMoon ? 0 : 0.06 * sunVis * smoothstep(42 * DEG, 9 * DEG, a.sunAlt) * (0.5 + this.haze); }
 
     // --- fill light
     const fillK = (0.35 + 1.4 * smoothstep(16 * DEG, -3 * DEG, a.sunAlt) + 1.1 * this.night) * Math.PI;

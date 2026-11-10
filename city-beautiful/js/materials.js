@@ -14,7 +14,7 @@ varying vec3 vWNrm;
 `;
 
 // Splice GLSL into a built-in material. Hooks:
-//   vertPars, vertBegin (may move `transformed`), vertEnd,
+//   vertPars, vertUv (after uvs are set), vertNormal (may set `objectNormal`), vertBegin (may move `transformed`), vertEnd,
 //   fragPars, fragColor (after vertex colour; may set diffuseColor), fragRough (roughnessFactor, metalnessFactor),
 //   fragNormal (view-space `normal`), fragEmissive (totalEmissiveRadiance), fragLight (reflectedLight), fragOut (gl_FragColor before fog)
 export function patch(material, o = {}) {
@@ -25,6 +25,8 @@ export function patch(material, o = {}) {
     Object.assign(shader.uniforms, uniforms);
     let vs = shader.vertexShader, fs = shader.fragmentShader;
     vs = vs.replace('#include <common>', '#include <common>\n' + WORLD_VERT_PARS + (o.vertPars || ''));
+    if (o.vertUv) vs = vs.replace('#include <uv_vertex>', '#include <uv_vertex>\n' + o.vertUv);
+    if (o.vertNormal) vs = vs.replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n' + o.vertNormal);
     if (o.vertBegin) vs = vs.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + o.vertBegin);
     vs = vs.replace('#include <normal_vertex>', '#include <normal_vertex>\n vWNrm = normalize(inverseTransformDirection(transformedNormal, viewMatrix));');
     vs = vs.replace('#include <project_vertex>', /* glsl */`#include <project_vertex>
@@ -110,7 +112,7 @@ const SURF_FRAG_COLOR = /* glsl */`
   vec4 S5 = texture2D(tNoise, q * 1.9 + 0.3);
 
   // the mix varies from pour to pour
-  alb *= 0.80 + 0.24 * S1.r + 0.16 * S2.g;
+  alb *= 0.70 + 0.22 * S1.r + 0.14 * S2.g;
   #ifndef SURF_GROUND
     #ifndef SURF_METAL
       float liftY = vWPos.y / 1.28;
@@ -138,6 +140,13 @@ const SURF_FRAG_COLOR = /* glsl */`
   float streak = smoothstep(0.46, 0.8, S4.g * 0.62 + S3.r * 0.2 + S4.r * 0.25) * wallF * (0.3 + 0.7 * S1.g);
   alb *= 1.0 - 0.52 * streak;
   alb = mix(alb, alb * vec3(0.6, 0.585, 0.54), (1.0 - aoV) * 0.65);     // grime where rain never reaches
+  // monsoon concrete goes black: an algal crust wherever water sits, patchy on the flat and heavy on ledges
+  float crust = smoothstep(0.3, 0.74, S1.g * 0.45 + S2.r * 0.4 + S3.g * 0.25) * (upF * 0.85 + wallF * 0.3 * S1.r);
+  #ifdef SURF_GROUND
+    crust *= 0.75;
+  #endif
+  alb *= 1.0 - 0.48 * crust * (1.0 - paintKeep * 0.6);
+  rgh = mix(rgh, 0.96, crust * 0.6);
 
   // moss and algae: on anything that faces up, climbing from the ground, and in every damp corner
   float mossN = S2.r * 0.58 + S3.g * 0.3 + (1.0 - cav) * 0.25 + S5.g * 0.12;
@@ -150,7 +159,7 @@ const SURF_FRAG_COLOR = /* glsl */`
     mossAmt *= 0.45;
   #endif
   float moss = smoothstep(1.0 - mossAmt, 1.0 - mossAmt + 0.2, mossN) * (1.0 - paintKeep * 0.55);
-  vec3 mossCol = mix(vec3(0.022, 0.026, 0.02), mix(vec3(0.04, 0.062, 0.02), vec3(0.095, 0.13, 0.036), S5.g), smoothstep(0.3, 0.7, S3.r));
+  vec3 mossCol = mix(vec3(0.02, 0.023, 0.018), mix(vec3(0.03, 0.045, 0.017), vec3(0.068, 0.092, 0.03), S5.g), smoothstep(0.3, 0.7, S3.r));
   alb = mix(alb, mossCol, moss * 0.93);
   rgh = mix(rgh, 0.97, moss * 0.8);
   sPert *= 1.0 - moss * 0.4;
@@ -159,19 +168,24 @@ const SURF_FRAG_COLOR = /* glsl */`
     // cracks: contour lines of a slow noise field, measured in metres so they stay hair-thin at any distance
     float crack = 0.0;
     {
-      vec4 ck = texture2D(tCrack, vWPos.xz * 0.026);
+      // two families of cracks, each a stretched field so its contours run long and nearly straight, crossing at an angle
+      vec2 cpA = vec2(vWPos.x * 0.94 + vWPos.z * 0.34, -vWPos.x * 0.34 + vWPos.z * 0.94) * vec2(0.0075, 0.043);
+      vec2 cpB = vec2(vWPos.x * 0.26 - vWPos.z * 0.97, vWPos.x * 0.97 + vWPos.z * 0.26) * vec2(0.0085, 0.051);
+      float fa = texture2D(tCrack, cpA).r, fb = texture2D(tCrack, cpB + 0.37).g;
+      vec4 ck = texture2D(tCrack, vWPos.xz * 0.019);
       vec2 dpx = dFdx(vWPos.xz), dpy = dFdy(vWPos.xz);
       float det = dpx.x * dpy.y - dpx.y * dpy.x; det = abs(det) < 1e-9 ? 1e-9 : det;
-      vec2 d1 = vec2(dFdx(ck.r), dFdy(ck.r)), d2 = vec2(dFdx(ck.g), dFdy(ck.g));
+      vec2 d1 = vec2(dFdx(fa), dFdy(fa)), d2 = vec2(dFdx(fb), dFdy(fb));
       vec2 g1 = vec2(dpy.y * d1.x - dpx.y * d1.y, dpx.x * d1.y - dpy.x * d1.x) / det;
       vec2 g2 = vec2(dpy.y * d2.x - dpx.y * d2.y, dpx.x * d2.y - dpy.x * d2.x) / det;
-      float m1 = abs(ck.r - 0.5) / max(length(g1), 1e-4), m2 = abs(ck.g - 0.46) / max(length(g2), 1e-4);
-      float cw = 0.006 + 0.016 * S3.g;
-      float c1 = smoothstep(cw, cw * 0.35, m1) * smoothstep(0.34, 0.5, ck.b);
-      float c2 = smoothstep(cw * 0.7, cw * 0.2, m2) * smoothstep(0.52, 0.66, ck.b);
+      float m1 = abs(fa - 0.5) / max(length(g1), 1e-4), m2 = abs(fb - 0.47) / max(length(g2), 1e-4);
+      float cw = 0.005 + 0.014 * S3.g;
+      float k1 = smoothstep(0.42, 0.56, ck.b), k2 = smoothstep(0.5, 0.36, ck.b) * smoothstep(0.3, 0.5, ck.r);
+      float c1 = smoothstep(cw, cw * 0.35, m1) * k1;
+      float c2 = smoothstep(cw * 0.8, cw * 0.25, m2) * k2;
       crack = max(c1, c2) * smoothstep(75.0, 30.0, length(vWPos - cameraPosition)) * upF;
       // damp, dirt and growth gather along a crack well beyond the gap itself
-      float seep = max(smoothstep(0.35, 0.0, m1) * smoothstep(0.34, 0.5, ck.b), smoothstep(0.22, 0.0, m2) * smoothstep(0.52, 0.66, ck.b));
+      float seep = max(smoothstep(0.3, 0.0, m1) * k1, smoothstep(0.22, 0.0, m2) * k2);
       cav = min(cav, 1.0 - 0.75 * max(crack, seep * 0.5));
       alb *= 1.0 - 0.72 * crack; alb *= 1.0 - 0.16 * seep;
     }
@@ -224,4 +238,38 @@ export function surface(kind, tex, { tile = 3.2, datum = 0, normalStrength = 1.0
     vertPars: SURF_VERT_PARS, vertEnd: 'vSurf = aSurf;',
     fragPars: SURF_FRAG_PARS, fragColor: SURF_FRAG_COLOR, fragRough: SURF_FRAG_ROUGH, fragNormal: SURF_FRAG_NORMAL, fragLight: SURF_FRAG_LIGHT,
   });
+}
+
+// Old glazing behind the sun-breakers: dusty panes in steel frames, a good third of them gone.
+export function glazing(noise) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0, vertexColors: true });
+  return patch(mat, {
+    key: 'glazing', uniforms: { tNoise: { value: noise } },
+    vertPars: SURF_VERT_PARS, vertEnd: 'vSurf = aSurf;',
+    fragPars: 'varying vec4 vSurf; uniform sampler2D tNoise;',
+    fragColor: /* glsl */`
+      vec3 gN = normalize(vWNrm);
+      vec2 gq = vec2(vWPos.x * gN.z - vWPos.z * gN.x, vWPos.y);
+      vec2 gp = gq / vec2(1.3, 1.82);
+      vec2 pane = floor(gp), pf = fract(gp);
+      float ph = fract(sin(dot(pane, vec2(12.9898, 78.233))) * 43758.5453);
+      vec4 gn = texture2D(tNoise, gq * 0.19);
+      float frame = clamp(step(pf.x, 0.04) + step(0.96, pf.x) + step(pf.y, 0.03) + step(0.97, pf.y), 0.0, 1.0);
+      // a broken pane keeps a jagged fringe of glass round its edge
+      float hole = step(ph, 0.36) * step(0.42 - 0.3 * ph, min(min(pf.x, 1.0 - pf.x), min(pf.y, 1.0 - pf.y)) + (gn.g - 0.5) * 0.5);
+      float dust = 0.3 + 0.7 * gn.r;
+      vec3 gcol = vColor * (0.5 + 2.2 * dust * dust);
+      gcol = mix(gcol, vec3(0.0035), hole);
+      gcol = mix(gcol, vec3(0.045, 0.04, 0.035), frame);
+      float gRough = mix(0.08 + 0.5 * dust * gn.g, 1.0, max(hole, frame));
+      diffuseColor.rgb = gcol;
+    `,
+    fragRough: 'roughnessFactor = gRough;',
+    fragLight: '{ float occ = vSurf.x; reflectedLight.indirectDiffuse *= occ; reflectedLight.indirectSpecular *= occ * (1.0 - hole); }',
+  });
+}
+
+// Far hills and anything else that is only a silhouette in the haze.
+export function distant() {
+  return patch(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, vertexColors: true, side: THREE.DoubleSide }), { key: 'distant' });
 }

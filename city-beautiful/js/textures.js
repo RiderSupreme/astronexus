@@ -251,3 +251,37 @@ export function bakeCrackField(baker, size = 256) {
     gl_FragColor = vec4(r, g, sat((b - 0.5) * 2.2 + 0.5), 1.0);
   `, size, { mip: false, aniso: 1 });
 }
+
+// Bark: deep vertical fissures between corky ridges. u runs round the trunk, v up it.
+export function bakeBark(baker, size = 512) {
+  const pre = /* glsl */`
+    vec4 barkH(vec2 uv) {
+      vec2 p = vec2(uv.x * 9.0 + fbm(uv * vec2(3.0, 5.0), 3.0, 3) * 1.6, uv.y * 2.2);
+      vec3 w = worley(p, 9.0);
+      float ridge = smoothstep(0.02, 0.36, w.y - w.x);
+      float plate = fbm(uv * vec2(14.0, 34.0) + 3.3, 14.0, 4);
+      float h = ridge * 0.75 + plate * 0.25;
+      return vec4(h, ridge, plate, w.z);
+    }`;
+  const h = baker.bake(/* glsl */`gl_FragColor = barkH(vUv);`, size, { pre, mip: false });
+  const a = baker.bake(/* glsl */`
+    vec4 s = texture2D(tH, vUv);
+    vec3 col = mix(vec3(0.085, 0.07, 0.055), mix(vec3(0.34, 0.3, 0.25), vec3(0.47, 0.44, 0.38), s.w), s.y);
+    col *= 0.75 + 0.5 * s.z;
+    float lichen = smoothstep(0.62, 0.8, fbm(vUv * 5.0 + 9.1, 5.0, 4)) * s.y;
+    col = mix(col, vec3(0.45, 0.5, 0.36), lichen * 0.55);
+    gl_FragColor = vec4(srgb(col), 1.0);
+  `, size, { srgb: true, pre: 'uniform sampler2D tH;', uniforms: { tH: { value: h } } });
+  const hh = baker.bake(/* glsl */`vec4 s = texture2D(tH, vUv); gl_FragColor = vec4(s.x, 0.0, 0.95 - s.y * 0.1, 0.45 + 0.55 * s.y);`, size, { pre: 'uniform sampler2D tH;', uniforms: { tH: { value: h } }, mip: false });
+  const n = baker.normalFromHeight(hh, size, { strength: 4.5, channel: 'x', b: 'z', a: 'w' });
+  h.userData.rt.dispose(); hh.userData.rt.dispose();
+  return { a, n };
+}
+
+// Ripples for standing water: a normal map in rg, tileable.
+export function bakeWaterNormal(baker, size = 256) {
+  const h = baker.bake(/* glsl */`float a = fbm(vUv * 6.0, 6.0, 5); float b = fbm(vUv * 13.0 + 2.7, 13.0, 4); gl_FragColor = vec4(a * 0.65 + b * 0.35, 0.0, 0.0, 1.0);`, size, { mip: false });
+  const n = baker.normalFromHeight(h, size, { strength: 2.2, channel: 'x', b: 'z', a: 'w' });
+  h.userData.rt.dispose();
+  return n;
+}

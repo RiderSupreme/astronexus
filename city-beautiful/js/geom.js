@@ -160,6 +160,21 @@ export class Builder {
     return -1;
   }
 
+  // Flat convex polygon. Points wind counter-clockwise seen from the side the normal should face.
+  poly(pts, opts) {
+    const o = this._o(opts), b = this._batch(o), n = pts.length;
+    const [p0, p1, p2] = pts;
+    const ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2], vx = p2[0] - p0[0], vy = p2[1] - p0[1], vz = p2[2] - p0[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    this._reserve(b, n, (n - 2) * 3);
+    const base = b.pos.n;
+    for (const p of pts) this._vert(b, o, p[0], p[1], p[2], nx, ny, nz);
+    const I = b.idx.a; let k = b.idx.n;
+    for (let i = 1; i < n - 1; i++) { I[k++] = base; I[k++] = base + i; I[k++] = base + i + 1; }
+    b.idx.n = k;
+  }
+
   // Upright prism with a regular n-gon section: columns, posts, drums. Smooth-shaded sides.
   cylinder(cx, cz, y0, y1, r, opts, sides = 14, r1 = r) {
     const o = this._o(opts), b = this._batch(o);
@@ -210,18 +225,22 @@ export class Builder {
       const l = Math.hypot(nx, ny, nz) || 1; const s = flip ? -1 : 1;
       segN.push([nx / l * s, ny / l * s, nz / l * s]);
     }
-    const vertN = i => {
-      if (!smooth) return null;
-      const a = segN[(i - 1 + count) % count], c = segN[i % count];
-      const pa = (closed || i > 0) ? a : c, pc = (closed || i < n - 1) ? c : a;
-      const x = pa[0] + pc[0], y = pa[1] + pc[1], z = pa[2] + pc[2], l = Math.hypot(x, y, z) || 1;
+    // normal for one end of a segment: blended with its neighbour unless the outline turns sharply there
+    const nAt = (seg, end) => {
+      const a = segN[seg];
+      if (!smooth) return a;
+      let o = end ? seg + 1 : seg - 1;
+      if (o < 0 || o >= count) { if (!closed) return a; o = (o + count) % count; }
+      const c = segN[o];
+      if (a[0] * c[0] + a[1] * c[1] + a[2] * c[2] < 0.72) return a;
+      const x = a[0] + c[0], y = a[1] + c[1], z = a[2] + c[2], l = Math.hypot(x, y, z) || 1;
       return [x / l, y / l, z / l];
     };
     this._reserve(b, count * 2 * (nw + 1) + 2 * n, count * nw * 6 + 2 * n * 3);
     const I = b.idx.a;
     for (let i = 0; i < count; i++) {
       const p = P[i], q = P[(i + 1) % n];
-      const n0 = vertN(i) || segN[i], n1 = vertN((i + 1) % (closed ? n : n + 1)) || segN[i];
+      const n0 = nAt(i, 0), n1 = nAt(i, 1);
       const base = b.pos.n;
       for (let j = 0; j <= nw; j++) {
         const t = j / nw;
