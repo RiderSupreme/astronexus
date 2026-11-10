@@ -89,13 +89,11 @@ const FOL_VERT_BEGIN = /* glsl */`
 #endif
 `;
 const FOL_FRAG_PARS = /* glsl */`
-varying vec4 vTint; uniform vec3 uLightDir; uniform float uTrans;
+varying vec4 vTint; uniform vec3 uLightDir; uniform vec3 uLightColor; uniform float uTrans;
 `;
 const FOL_FRAG_COLOR = /* glsl */`
 #ifdef FOL_CUTOUT
-  { vec2 ts = vMapUv * 2048.0; vec2 ddx = dFdx(ts), ddy = dFdy(ts);
-    float lod = max(0.0, 0.5 * log2(max(dot(ddx, ddx), dot(ddy, ddy))));
-    diffuseColor.a *= 1.0 + lod * 0.28;                       // keep cards from thinning out with distance
+  {
     #ifdef FOL_A2C
       diffuseColor.a = clamp((diffuseColor.a - 0.4) / max(fwidth(diffuseColor.a), 1e-4) + 0.5, 0.0, 1.0);
     #endif
@@ -112,18 +110,23 @@ const FOL_FRAG_LIGHT = /* glsl */`
   { vec3 vdir = normalize(vWPos - cameraPosition);
     float back = pow(max(dot(vdir, uLightDir), 0.0), 3.0);    // looking into the light, leaves glow with what passes through them
     reflectedLight.directDiffuse *= 1.0 + back * uTrans;
+    #ifdef FOL_TREE
+      // sun on the far side of a leaf comes through it; the outer crown glows, the inside stays dark
+      float through = max(dot(-normalize(vWNrm), uLightDir), 0.0) * smoothstep(0.55, 1.0, vTint.r);
+      reflectedLight.directDiffuse += diffuseColor.rgb * vec3(1.0, 1.05, 0.55) * uLightColor * (through * (0.1 + 0.3 * back));
+    #endif
     reflectedLight.indirectDiffuse *= vTint.a; reflectedLight.indirectSpecular *= vTint.a * 0.4; }
 `;
 
 function foliageMaterial({ map = null, noise, defines = {}, key, a2c = false, trans = 2.2, roughness = 0.72, side = THREE.DoubleSide, color = 0xffffff, cutout = true }) {
-  const mat = new THREE.MeshStandardMaterial({ color, map, roughness, metalness: 0, side, alphaTest: cutout ? (a2c ? 0.03 : 0.42) : 0 });
+  const mat = new THREE.MeshStandardMaterial({ color, map, roughness, metalness: 0, side, alphaTest: cutout ? (a2c ? 0.03 : 0.4) : 0 });
   if (a2c && cutout) { mat.alphaToCoverage = true; defines.FOL_A2C = 1; }
   if (cutout) defines.FOL_CUTOUT = 1;
-  const uniforms = { tNoise: { value: noise }, uWind: GU.uWind, uPlayer: GU.uCamPos, uLightDir: GU.uLightDir, uTrans: { value: trans } };
+  const uniforms = { tNoise: { value: noise }, uWind: GU.uWind, uPlayer: GU.uCamPos, uLightDir: GU.uLightDir, uLightColor: GU.uLightColor, uTrans: { value: trans } };
   patch(mat, { key: 'fol-' + key + (a2c ? '-a2c' : ''), defines, uniforms, vertPars: FOL_VERT_PARS, vertUv: FOL_VERT_UV, vertNormal: FOL_VERT_NORMAL, vertBegin: FOL_VERT_BEGIN,
     fragPars: FOL_FRAG_PARS, fragColor: FOL_FRAG_COLOR, fragNormal: FOL_FRAG_NORMAL, fragLight: FOL_FRAG_LIGHT });
   // the same motion in the shadow pass, or shadows would stand still while the leaves move
-  const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: cutout ? map : null, alphaTest: cutout ? 0.42 : 0, side });
+  const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: cutout ? map : null, alphaTest: cutout ? 0.4 : 0, side });
   const dd = { ...defines }; delete dd.FOL_A2C; delete dd.FOL_UPNORMAL;
   patch(depth, { key: 'fold-' + key, defines: dd, uniforms, fog: false, vertPars: FOL_VERT_PARS, vertUv: FOL_VERT_UV, vertBegin: FOL_VERT_BEGIN });
   mat.userData.depth = depth;
@@ -228,8 +231,11 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3
 const UP = new THREE.Vector3(0, 1, 0);
 const SKY_DIRS = [[0, 1, 0], [0.5, 0.86, 0], [-0.5, 0.86, 0], [0, 0.86, 0.5], [0, 0.86, -0.5], [0.61, 0.5, 0.61], [-0.61, 0.5, 0.61], [0.61, 0.5, -0.61], [-0.61, 0.5, -0.61]];
 
-function growTree(name, seed, lowDetail = false) {
-  const S = SPECIES[name], rng = makeRng(seed);
+// detail: 0 full, 1 for the tree line just outside the complex, 2 for silhouettes beyond it
+function growTree(name, seed, detail = 0) {
+  const S0 = SPECIES[name], rng = makeRng(seed), lowDetail = detail > 0;
+  // the farthest trees lose their twigs altogether: boughs and a few big cards
+  const S = detail === 2 ? { ...S0, depth: Math.min(S0.depth, 2), roots: 0 } : S0;
   const wood = { p: [], n: [], uv: [], l: [], i: [] }, leaf = { p: [], n: [], uv: [], l: [], i: [] };
   const tips = [], colliders = [];
   const trunkLen = rng.range(...S.trunk), trunkRad = rng.range(...S.radius);
@@ -290,7 +296,7 @@ function growTree(name, seed, lowDetail = false) {
       }
     } else {
       tips.push(pts[pts.length - 1].p.clone());
-      for (let k = 1; k <= S.alongLast; k++) tips.push(pts[Math.max(1, Math.round((segs * k) / (S.alongLast + 1.5)))].p.clone());
+      if (detail < 2) for (let k = 1; k <= (lowDetail ? 1 : S.alongLast); k++) tips.push(pts[Math.max(1, Math.round((segs * k) / (S.alongLast + 1.5)))].p.clone());
     }
   };
   grow(new THREE.Vector3(0, -0.4, 0), new THREE.Vector3(rng.range(-0.06, 0.06), 1, rng.range(-0.06, 0.06)).normalize(), trunkLen + 0.4, trunkRad, 0);
@@ -319,7 +325,7 @@ function growTree(name, seed, lowDetail = false) {
   let crownR = 1; for (const t of tips) crownR = Math.max(crownR, t.distanceTo(centre));
   if (S.tile) {
     const [c0, r0] = TILES[S.tile], e = 6 / 2048, u0 = c0 / GRID + e, u1 = (c0 + 1) / GRID - e, v0 = 1 - (r0 + 1) / GRID + e, v1 = 1 - r0 / GRID - e;
-    const per = lowDetail ? Math.max(2, Math.round(S.perTip * 0.45)) : S.perTip, scale = lowDetail ? 1.5 : 1;
+    const per = detail === 2 ? 2 : lowDetail ? Math.max(2, Math.round(S.perTip * 0.4)) : S.perTip, scale = detail === 2 ? 2.3 : lowDetail ? 1.55 : 1;
     for (const t of tips) for (let k = 0; k < per; k++) {
       const c = _a.set(rng.gauss(), rng.gauss() * 0.75, rng.gauss()).multiplyScalar(S.tipRadius * 0.5 * scale).add(t);
       const s = rng.range(...S.card) * scale;
@@ -422,10 +428,10 @@ export class Vegetation {
       for (const s of spots) if (Math.hypot(s.x - x, s.z - z) < (s.r + r) * 0.75) return false;
       return true;
     };
-    const put = (species, x, z, scale = 1, yaw = rng.range(0, TAU), variant = rng.int(0, 2), y = null, far = false) => spots.push({ species, x, z, y: y === null ? w.heightAt(x, z) : y, scale, yaw, variant, r: species === 'banyan' ? 3.2 * scale : 1.1 * scale, far });
+    const put = (species, x, z, scale = 1, yaw = rng.range(0, TAU), variant = rng.int(0, 1), y = null, detail = 0) => spots.push({ species, x, z, y: y === null ? w.heightAt(x, z) : y, scale, yaw, variant: detail ? 0 : variant, r: species === 'banyan' ? 3.2 * scale : 1.1 * scale, detail });
     // the great banyans, set where they compose with the buildings
-    put('banyan', -40, 46, 1.15, 0.4, 0); put('banyan', 60, -60, 1.0, 2.1, 1); put('banyan', -54, -52, 0.95, 4.0, 2);
-    put('banyan', 24, 98, 1.1, 1.2, 1); put('banyan', -106, 76, 1.25, 5.1, 0); put('banyan', 124, 84, 1.05, 3.3, 2); put('banyan', -18, -104, 1.0, 0.9, 1);
+    put('banyan', -40, 46, 1.15, 0.4, 0); put('banyan', 60, -60, 1.0, 2.1, 1); put('banyan', -54, -52, 0.95, 4.0, 0);
+    put('banyan', 24, 98, 1.1, 1.2, 1); put('banyan', -106, 76, 1.25, 5.1, 0); put('banyan', 124, 84, 1.05, 3.3, 1); put('banyan', -18, -104, 1.0, 0.9, 1);
     put('banyan', 150, -92, 1.1, 2.6, 0);
     // peepal and neem through the meadows, the odd one up through the paving
     let tries = 0;
@@ -438,7 +444,7 @@ export class Vegetation {
       put(r < 0.45 ? 'peepal' : r < 0.9 ? 'neem' : 'snag', x, z, rng.range(0.8, 1.25));
     }
     // the wooded bank that closes the complex in
-    const ring = (inset, step, far) => {
+    const ring = (inset, step, detail) => {
       const per = 2 * ((BOUNDS.x1 - BOUNDS.x0) + (BOUNDS.z1 - BOUNDS.z0) + 8 * inset);
       for (let s = 0; s < per; s += step * rng.range(0.7, 1.3)) {
         const W = BOUNDS.x1 - BOUNDS.x0 + 2 * inset, H = BOUNDS.z1 - BOUNDS.z0 + 2 * inset;
@@ -448,10 +454,10 @@ export class Vegetation {
         x += rng.range(-4, 4); z += rng.range(-4, 4);
         if (Math.abs(x) < 9 && z > 100) continue;               // the gap the road came through
         const r = rng();
-        put(r < 0.2 ? 'banyan' : r < 0.6 ? 'neem' : 'peepal', x, z, rng.range(1.0, 1.5), undefined, undefined, undefined, far);
+        put(r < 0.1 ? 'banyan' : r < 0.55 ? 'neem' : 'peepal', x, z, rng.range(1.0, 1.5), undefined, undefined, undefined, detail);
       }
     };
-    ring(5, 9, false); ring(17, 11, true); ring(32, 15, true);
+    ring(5, 12, 1); ring(17, 16, 2); ring(32, 22, 2);
     // seedlings on ledges and roofs: (x, y, z)
     for (const [x, y, z] of [[-100, 15.55, -20], [-94, 15.55, 24], [-140, 15.55, 30], [-118, 15.55, 0], [108, 22.2, -40], [126, 22.2, 12], [140, 22.2, 44], [100, 22.2, 30], [-10, 12.95, -12], [-20, 12.95, 0],
       [-243, 41, -30], [-243, 41, 40], [-243, 41, 90], [-243, 28.7, -70], [44, 2.9, -1.7], [57.7, 2.9, 12], [-80, 17.6, -20], [-76, 17.2, 14]]) put('sapling', x, z, rng.range(0.9, 2.2), undefined, undefined, y);
@@ -460,17 +466,17 @@ export class Vegetation {
 
   _buildTrees(spots) {
     const variants = new Map();
-    const get = (species, v, far) => {
-      const k = species + v + (far ? 'f' : '');
-      if (!variants.has(k)) variants.set(k, { tree: growTree(species, 7919 * (v + 1) + species.length * 31, far), spots: [] });
+    const get = (species, v, detail) => {
+      const k = species + v + 'd' + detail;
+      if (!variants.has(k)) variants.set(k, { tree: growTree(species, 7919 * (v + 1) + species.length * 31, detail), spots: [], detail });
       return variants.get(k);
     };
     for (const s of spots) {
-      const V = get(s.species, s.variant, s.far);
+      const V = get(s.species, s.variant, s.detail);
       V.spots.push(s);
       const T = V.tree;
       if (s.species !== 'sapling') this.trees.push({ x: s.x, z: s.z, y: s.y, r: T.crownR * s.scale, species: s.species });
-      if (!s.far && s.species !== 'sapling') for (const c of T.colliders) {
+      if (s.detail < 2 && s.species !== 'sapling') for (const c of T.colliders) {
         const cs = Math.cos(s.yaw), sn = Math.sin(s.yaw);
         const id = this.world.solids.addCyl(s.x + (cs * c.x + sn * c.z) * s.scale, s.z + (-sn * c.x + cs * c.z) * s.scale, c.r * s.scale, s.y - 1, s.y + c.h * s.scale, SOLID.MOVE | SOLID.SHOT | SOLID.NAV, SURF.wood);
         this.world.solids.addLate(id);
@@ -480,7 +486,8 @@ export class Vegetation {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
     for (const V of variants.values()) {
       const regions = new Map();
-      for (const s of V.spots) { const k = Math.floor(s.x / 90) + ',' + Math.floor(s.z / 90); if (!regions.has(k)) regions.set(k, []); regions.get(k).push(s); }
+      const cell = V.detail ? 200 : 110;
+      for (const s of V.spots) { const k = Math.floor((s.x + 400) / cell) + ',' + Math.floor((s.z + 400) / cell); if (!regions.has(k)) regions.set(k, []); regions.get(k).push(s); }
       for (const list of regions.values()) {
         for (const part of ['wood', 'leaves']) {
           const geo = V.tree[part]; if (!geo) continue;
@@ -488,8 +495,7 @@ export class Vegetation {
           list.forEach((s, i) => { q.setFromAxisAngle(UP, s.yaw); sc.setScalar(s.scale); p.set(s.x, s.y, s.z); m4.compose(p, q, sc); im.setMatrixAt(i, m4); });
           im.instanceMatrix.needsUpdate = true;
           im.customDepthMaterial = (part === 'wood' ? this.mats.wood : this.mats.leaves).userData.depth;
-          const far = list[0].far;
-          im.castShadow = !far; im.receiveShadow = true; im.matrixAutoUpdate = false;
+          im.castShadow = V.detail === 0; im.receiveShadow = true; im.matrixAutoUpdate = false;
           im.computeBoundingSphere();
           this.group.add(im); this.treeMeshes.push(im);
         }

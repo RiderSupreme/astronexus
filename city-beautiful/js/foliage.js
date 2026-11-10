@@ -115,8 +115,8 @@ function blade(ctx, x, y, h, lean, w, c0, c1) {
   ctx.beginPath(); ctx.moveTo(x - w / 2, y); ctx.quadraticCurveTo(mx - w * 0.4, my, tx, ty); ctx.quadraticCurveTo(mx + w * 0.4, my, x + w / 2, y); ctx.closePath(); ctx.fill();
 }
 
-const GREENS = [[0.2, 0.34, 0.1], [0.26, 0.4, 0.12], [0.17, 0.29, 0.09], [0.31, 0.43, 0.14]];
-const DEEP = [[0.1, 0.22, 0.08], [0.13, 0.27, 0.09], [0.09, 0.19, 0.07], [0.16, 0.3, 0.1]];
+const GREENS = [[0.24, 0.38, 0.12], [0.3, 0.44, 0.14], [0.2, 0.33, 0.11], [0.35, 0.47, 0.16]];
+const DEEP = [[0.17, 0.31, 0.12], [0.2, 0.36, 0.13], [0.15, 0.27, 0.11], [0.24, 0.4, 0.14]];
 
 const PAINTERS = {
   grass(ctx, rng, S) {
@@ -289,7 +289,47 @@ export function buildFoliageAtlas(maxAniso = 4) {
   if (debug) window.__atlasCanvas = debug;
   const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat, THREE.UnsignedByteType);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+  tex.mipmaps = buildMips(data, N);
+  tex.generateMipmaps = false; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
   tex.anisotropy = maxAniso; tex.needsUpdate = true;
   return tex;
+}
+
+// Mip levels made by hand, for two reasons. Colour is averaged weighted by alpha, so leaf edges do not
+// darken. And each tile's alpha is rescaled at every level so the same fraction of it passes the cutout
+// test as at full size: without that, sparse cards (grass, vines) thin away with distance while dense
+// ones (leaf clusters) fill in to solid squares. The chain stops while a tile is still 4 texels wide,
+// so neighbouring tiles never blend.
+export const ALPHA_CUT = 0.4;
+function buildMips(base, N) {
+  const thr = Math.round(ALPHA_CUT * 255), T0 = N / GRID;
+  const coverage = (d, w, ts, bx, by) => { let n = 0; for (let y = 0; y < ts; y++) { let o = ((by * ts + y) * w + bx * ts) * 4 + 3; for (let x = 0; x < ts; x++, o += 4) if (d[o] >= thr) n++; } return n / (ts * ts); };
+  const want = [];
+  for (let by = 0; by < GRID; by++) for (let bx = 0; bx < GRID; bx++) want.push(coverage(base, N, T0, bx, by));
+  const mips = [{ data: base, width: N, height: N }];
+  let prev = base, pw = N;
+  const hist = new Uint32Array(256);
+  for (let L = 1; (T0 >> L) >= 4; L++) {
+    const w = pw >> 1, d = new Uint8Array(w * w * 4);
+    for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) {
+      const i0 = ((y * 2) * pw + x * 2) * 4, i1 = i0 + 4, i2 = i0 + pw * 4, i3 = i2 + 4;
+      const a0 = prev[i0 + 3], a1 = prev[i1 + 3], a2 = prev[i2 + 3], a3 = prev[i3 + 3], sa = a0 + a1 + a2 + a3, o = (y * w + x) * 4;
+      if (sa > 0) for (let k = 0; k < 3; k++) d[o + k] = (prev[i0 + k] * a0 + prev[i1 + k] * a1 + prev[i2 + k] * a2 + prev[i3 + k] * a3) / sa;
+      else for (let k = 0; k < 3; k++) d[o + k] = (prev[i0 + k] + prev[i1 + k] + prev[i2 + k] + prev[i3 + k]) >> 2;
+      d[o + 3] = sa >> 2;
+    }
+    const ts = T0 >> L;
+    for (let by = 0; by < GRID; by++) for (let bx = 0; bx < GRID; bx++) {
+      hist.fill(0);
+      for (let y = 0; y < ts; y++) { let o = ((by * ts + y) * w + bx * ts) * 4 + 3; for (let x = 0; x < ts; x++, o += 4) hist[d[o]]++; }
+      // the alpha value above which exactly the wanted fraction of this tile lies
+      const target = want[by * GRID + bx] * ts * ts; let acc = 0, v = 255;
+      for (; v > 0; v--) { acc += hist[v]; if (acc >= target) break; }
+      const k = Math.min(6, Math.max(0.25, thr / Math.max(v, 1)));
+      for (let y = 0; y < ts; y++) { let o = ((by * ts + y) * w + bx * ts) * 4 + 3; for (let x = 0; x < ts; x++, o += 4) d[o] = Math.min(255, Math.round(d[o] * k)); }
+    }
+    mips.push({ data: d, width: w, height: w });
+    prev = d; pw = w;
+  }
+  return mips;
 }

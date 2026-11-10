@@ -11,6 +11,7 @@ import { GU, FOG_GLSL } from './shared.js';
 const WORLD_VERT_PARS = /* glsl */`
 varying vec3 vWPos;
 varying vec3 vWNrm;
+uniform float uTime;
 `;
 
 // Splice GLSL into a built-in material. Hooks:
@@ -272,4 +273,31 @@ export function glazing(noise) {
 // Far hills and anything else that is only a silhouette in the haze.
 export function distant() {
   return patch(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, vertexColors: true, side: THREE.DoubleSide }), { key: 'distant' });
+}
+
+// Standing water: sixty monsoons of silt, a skin of duckweed, and the sky in whatever is left clear.
+export function water(noise, ripple) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0 });
+  return patch(mat, {
+    key: 'water', uniforms: { tNoise: { value: noise }, tRipple: { value: ripple }, uWind: GU.uWind, uWet: GU.uWet },
+    fragPars: 'uniform sampler2D tNoise; uniform sampler2D tRipple; uniform vec4 uWind; uniform float uWet;',
+    fragColor: /* glsl */`
+      vec2 wp = vWPos.xz;
+      float scumN = texture2D(tNoise, wp * 0.045 + 0.3 + uWind.xy * uTime * 0.0008).r * 0.6 + texture2D(tNoise, wp * 0.17).g * 0.4;
+      float scum = smoothstep(0.5, 0.58, scumN);
+      vec3 scumCol = mix(vec3(0.05, 0.085, 0.018), vec3(0.11, 0.15, 0.035), texture2D(tNoise, wp * 0.9).g);
+      diffuseColor.rgb = mix(vec3(0.01, 0.018, 0.011), scumCol, scum);
+    `,
+    fragRough: 'roughnessFactor = mix(0.04, 0.88, scum);',
+    fragNormal: /* glsl */`
+      { vec2 r1 = texture2D(tRipple, wp * 0.21 + uWind.xy * uTime * 0.02).xy * 2.0 - 1.0;
+        vec2 r2 = texture2D(tRipple, wp * 0.47 - uWind.yx * uTime * 0.013 + 0.4).xy * 2.0 - 1.0;
+        // rain pocks the surface with rings
+        vec2 rc = fract(wp * 0.7 + vec2(floor(uTime * 2.3) * 0.37, floor(uTime * 2.3) * 0.61)) - 0.5;
+        float ring = sin(length(rc) * 40.0 - fract(uTime * 2.3) * 14.0) * smoothstep(0.5, 0.1, length(rc)) * uWet;
+        float k = (0.16 + 0.3 * uWet) * (1.0 - scum);
+        vec3 wn = normalize(vec3((r1.x + r2.x) * k + rc.x * ring * 0.6, 1.0, (r1.y + r2.y) * k + rc.y * ring * 0.6));
+        normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz); }
+    `,
+  });
 }

@@ -62,7 +62,7 @@ function stairs(w, x0, z0, x1, z1, axis, y0, y1, opts = {}) {
 }
 
 // A rectangular basin: rim, bed and a record for the water surface.
-function pool(w, x0, z0, x1, z1, { rim = 0.5, bed = -0.75, level = -0.14, lip = 0.16 } = {}) {
+function pool(w, x0, z0, x1, z1, { rim = 0.5, bed = -0.45, level = -0.12, lip = 0.16 } = {}) {
   const b = w.b;
   w.holes.push({ x0, z0, x1, z1 });
   w.flats.push({ x0, z0, x1, z1, y: bed });
@@ -73,7 +73,7 @@ function pool(w, x0, z0, x1, z1, { rim = 0.5, bed = -0.75, level = -0.14, lip = 
   b.face(x0, bed, z0, x1 - x0, 0, 0, 0, -bed, 0, o); b.face(x0, bed, z1, 0, -bed, 0, x1 - x0, 0, 0, o);   // inner walls
   b.face(x0, bed, z0, 0, -bed, 0, 0, 0, z1 - z0, o); b.face(x1, bed, z0, 0, 0, z1 - z0, 0, -bed, 0, o);
   // a low kerb all round: low enough to step over
-  const k = { solid: SOLID.ALL, grow: 0.3, seg: 3 };
+  const k = { solid: SHOT_AO, grow: 0.3, seg: 3 };       // a kerb, not a wall: anything can wade in and out
   b.box(x0 - rim, 0, z0 - rim, x1 + rim, lip, z0, k); b.box(x0 - rim, 0, z1, x1 + rim, lip, z1 + rim, k);
   b.box(x0 - rim, 0, z0, x0, lip, z1, k); b.box(x1, 0, z0, x1 + rim, lip, z1, k);
 }
@@ -303,6 +303,23 @@ function openHand(w) {
   b.box(MX - 3.4, D, MZ - 3.4, MX + 3.4, D + 1.1, MZ + 3.4, { seg: 2.2 });
   b.box(MX - 1.3, D + 1.1, MZ - 1.3, MX + 1.3, 12.2, MZ + 1.3, { vboards: true, seg: 2 });
   b.cylinder(MX, MZ, 12.2, 13.4, 0.5, { mat: 'metal', color: PAINT.black, paint: 0.35, surf: SURF.metal }, 12);
+  {
+    // the hand in outline: thumb out to one side like a bird's head, four fingers raised, the palm drawn in to a wrist
+    const pts = [[-1.1, 0], [-2.3, 1.7], [-3.7, 3.5], [-4.8, 5.5], [-5.9, 7.3], [-6.7, 8.5], [-6.5, 9.4], [-5.6, 9.6], [-4.4, 8.7], [-2.9, 6.8], [-2.1, 7.6],
+      [-1.8, 11.6], [-1.5, 13.0], [-0.8, 13.4], [-0.2, 12.7], [0.0, 8.6], [0.5, 12.9], [0.8, 13.9], [1.5, 14.1], [2.1, 13.4], [2.2, 8.4], [2.7, 12.0], [3.1, 12.7], [3.8, 12.7], [4.2, 11.8],
+      [4.3, 7.7], [4.9, 9.6], [5.4, 10.2], [6.1, 10.1], [6.3, 9.2], [6.0, 6.5], [5.3, 4.8], [3.6, 3.0], [1.7, 1.4], [1.1, 0]];
+    const shape = new THREE.Shape(); shape.moveTo(pts[0][0], pts[0][1]);
+    shape.splineThru(pts.slice(1).map(p => new THREE.Vector2(p[0], p[1])));
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.8, bevelEnabled: true, bevelThickness: 0.22, bevelSize: 0.2, bevelSegments: 2, curveSegments: 6, steps: 1 });
+    // a vane: it stands edge-on to the wind, which here comes steadily out of the north-west
+    const yaw = Math.atan2(-0.6, 0.8);
+    const m = new THREE.Matrix4().makeRotationY(yaw).multiply(new THREE.Matrix4().makeTranslation(0, 0, -0.4)).setPosition(MX, 13.4, MZ);
+    m.elements[12] = MX - Math.sin(yaw) * 0.4 * 0; m.elements[13] = 13.4; m.elements[14] = MZ;
+    b.add(geo, m, { mat: 'metal', color: [0.2, 0.21, 0.2], paint: 0.6, surf: SURF.metal });
+    geo.dispose();
+    w.solids.addOBox(MX, 13.4, MZ, 6.6, 27.6, 0.6, yaw, SHOT_AO, SURF.metal);
+    w.landmarks.handYaw = yaw;
+  }
   w.landmarks.openHand = { x: MX, y: 13.4, z: MZ, base: D };
   w.landmarks.beacon = { x: MX, y: D, z: MZ + 5.6 };
   // a speaker's rostrum faces the hand across the court
