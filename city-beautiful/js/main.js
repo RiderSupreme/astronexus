@@ -7,7 +7,7 @@ import { Sky } from './sky.js';
 import { GU } from './shared.js';
 import { jdFromLocal, localHours } from './astro.js';
 import { DEG, makeSlicer, nextFrame, store, clamp, damp, makeRng, mod } from './util.js';
-import { surface, glazing, distant, water } from './materials.js';
+import { surface, glazing, distant, water, matte } from './materials.js';
 import { World, buildBackdrop, START } from './world.js';
 import { SURF } from './physics.js';
 import { Vegetation } from './vegetation.js';
@@ -20,6 +20,7 @@ import { Weapons } from './weapons.js';
 import { Mission } from './mission.js';
 import { Hud } from './hud.js';
 import { GameAudio } from './audio.js';
+import { buildSigns } from './props.js';
 
 const params = new URLSearchParams(location.search);
 const DEV = params.has('dev');
@@ -71,6 +72,7 @@ class Game {
       ground: surface('ground', tex.paving, { noise, tile: 4, soil: tex.soil, cracks: bakeCrackField(baker) }),
       metal: surface('metal', tex.rust, { noise, tile: 1.5 }),
       glass: glazing(noise),
+      flat: matte(noise),
     };
     const world = this.world = new World();
     await world.build(mats, slicer, (f, label) => progress(0.08 + f * 0.6, label));
@@ -99,11 +101,15 @@ class Game {
     this.weapons = new Weapons(this);
     this.hud = new Hud(this);
     this.mission = new Mission(this);
-    progress(0.95, 'Waiting for the light');
+    progress(0.93, 'Painting the signs');
+    await buildSigns(this);
+    progress(0.96, 'Waiting for the light');
     await nextFrame();
     this.sky.setTime(this.jd);
     this.update(0.016); this.render();
     addEventListener('resize', () => this.resize());
+    // P works as a toggle; Esc can only pause, because a browser will not hand the mouse back on Esc
+    addEventListener('keydown', e => { if (e.code === 'KeyP' && !e.repeat && this.state === 'paused') this.resume(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'playing') this.pause(); });
     this.resize();
     progress(1, 'Ready');
@@ -118,7 +124,7 @@ class Game {
     this.audio.start(); this.audio.setVolume(this.settings.volume, this.settings.music); this.audio.suspend(false);
     this.weapons.reset(); this.mission.reset();
     this.player.spawn(START.x, START.z, START.yaw);
-    this.state = 'playing'; this.input.enabled = true; this.time = 0; this.endT = 0;
+    this.state = 'playing'; this.input.enabled = true; this.input.endFrame(); this.time = 0; this.endT = 0;
     this.hud.show(null); this.hud.subs.length = 0; this.hud.subT = 0; document.getElementById('subtitle').hidden = true;
     this.input.lock();
     this.mission.start();
@@ -130,7 +136,8 @@ class Game {
   }
   resume() {
     if (this.state !== 'paused') return;
-    this.state = 'playing'; this.input.enabled = true; this.hud.show(null); this.audio.suspend(false); this.input.lock(); this.last = 0;
+    this.state = 'playing'; this.input.enabled = true; this.input.endFrame();      // a key pressed on the menu is not a key pressed in the game
+    this.hud.show(null); this.audio.suspend(false); this.input.lock(); this.last = 0;
   }
   toTitle() {
     this.state = 'title'; this.input.enabled = false; this.input.unlock(); this.audio.suspend(false);
@@ -166,7 +173,7 @@ class Game {
     if (this.state !== 'paused') this.jd += (this.clockRate * dt) / 24;
     const sunUp = this.sky.astro.sunAlt > -0.02;
     if (live) {
-      if (playing && this.input.pressed.pause && (this.input.touch || this.input.lockFailed || !this.input.locked)) this.pause();
+      if (playing && this.input.pressed.pause) this.pause();
       p.update(dt, this.input, playing);
       this.weapons.update(dt, p, this.input, playing);
       this.horde.update(dt, p, sunUp);

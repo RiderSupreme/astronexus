@@ -270,6 +270,29 @@ export function glazing(noise) {
   });
 }
 
+// Rubber, canvas, timber, sandbags: no texture of their own, only colour, dirt and the damp.
+export function matte(noise) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, vertexColors: true });
+  return patch(mat, {
+    key: 'matte', uniforms: { tNoise: { value: noise }, uWet: GU.uWet },
+    vertPars: SURF_VERT_PARS, vertEnd: 'vSurf = aSurf;',
+    fragPars: 'varying vec4 vSurf; uniform sampler2D tNoise; uniform float uWet;',
+    fragColor: /* glsl */`
+      vec3 mN = normalize(vWNrm);
+      vec2 mq = mix(vec2(vWPos.x * mN.z - vWPos.z * mN.x, vWPos.y), vWPos.xz, step(0.6, abs(mN.y)));
+      vec4 m1 = texture2D(tNoise, mq * 0.11 + 0.3), m2 = texture2D(tNoise, mq * 0.9);
+      vec3 mc = diffuseColor.rgb * (0.62 + 0.5 * m1.r + 0.22 * m2.g);
+      float mUp = smoothstep(0.5, 0.9, mN.y);
+      float mDirt = smoothstep(0.45, 0.8, m1.g * 0.6 + m2.r * 0.4 + mUp * 0.25 + (1.0 - vSurf.x) * 0.4);
+      mc = mix(mc, vec3(0.035, 0.04, 0.022) + 0.03 * m2.b, mDirt * 0.7);
+      mc *= mix(1.0, 0.6, uWet * (0.4 + 0.6 * mUp));
+      diffuseColor.rgb = mc;
+    `,
+    fragRough: 'roughnessFactor = mix(0.92, 0.5, uWet * 0.6);',
+    fragLight: '{ float occ = vSurf.x; reflectedLight.indirectDiffuse *= occ; reflectedLight.indirectSpecular *= occ * occ; }',
+  });
+}
+
 // Far hills and anything else that is only a silhouette in the haze.
 export function distant() {
   return patch(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, vertexColors: true, side: THREE.DoubleSide }), { key: 'distant' });

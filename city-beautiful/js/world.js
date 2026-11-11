@@ -9,6 +9,7 @@ import { Solids, SOLID, SURF } from './physics.js';
 import { Builder, bakeAO } from './geom.js';
 import { clamp, lerp, smoothstep, fbm2, noise2, makeRng } from './util.js';
 import { buildCapitol } from './capitol.js';
+import { buildProps } from './props.js';
 
 export const BOUNDS = { x0: -168, z0: -128, x1: 168, z1: 136 };          // where a body may go
 export const FINE = { x0: -200, z0: -160, x1: 200, z1: 168, cell: 2 };   // finely tessellated ground
@@ -211,6 +212,7 @@ export class World {
     progress(0.12, 'Laying the esplanade');
     this._bakeHeights();
     this._buildGround();
+    buildProps(this);                        // what people left behind
     // the edge of the world: nothing passes, nothing is seen
     const B = BOUNDS, t = 4, wall = SOLID.MOVE | SOLID.NAV;
     this.solids.addBox(B.x0 - t, -20, B.z0 - t, B.x0, 60, B.z1 + t, wall);
