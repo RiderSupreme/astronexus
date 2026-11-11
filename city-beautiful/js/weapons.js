@@ -377,6 +377,7 @@ export class Weapons {
     // torch
     this.torchPower = damp(this.torchPower, this.torchOn && player.alive ? 1 : 0, 14, dt);
     this.torch.intensity = this.torchPower * 240;
+    this.torch.shadow.autoUpdate = this.torchPower > 0.004;        // an unlit torch should not cost a pass over the whole scene
     cam.getWorldDirection(_d);
     this.torch.position.copy(o).addScaledVector(_d, 0.1); this.torch.position.y -= 0.12;
     this.torch.target.position.copy(o).addScaledVector(_d, 12);

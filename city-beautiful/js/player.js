@@ -144,7 +144,9 @@ export class Player {
     const shP = (Math.sin(this.bob * 37.1 + performance.now() * 0.047) * 0.5 + Math.sin(performance.now() * 0.091) * 0.5) * t * 0.035;
     const shY = Math.sin(performance.now() * 0.063 + 1.7) * t * 0.035, shR = Math.sin(performance.now() * 0.077 + 4.1) * t * 0.05;
     cam.rotation.set(this.pitch + this.kickPitch + shP, this.yaw + this.kickYaw + shY, -strafe * 0.012 * b + shR + (this.alive ? 0 : 0.5 * (1 - Math.exp(-this.sinceHurt * 3))), 'YXZ');
-    const want = this.fov * (this.aiming ? this.aimZoom || 0.78 : this.sprinting ? 1.07 : 1);
+    // the setting is the view's height in degrees; on a screen taller than it is wide, widen it so the sides are not lost
+    const tall = cam.aspect < 1 ? Math.min(100, 2 * Math.atan(Math.tan(this.fov * 0.5 * (Math.PI / 180)) / Math.max(0.45, cam.aspect) * 0.62) * (180 / Math.PI)) : this.fov;
+    const want = Math.max(this.fov, tall) * (this.aiming ? this.aimZoom || 0.78 : this.sprinting ? 1.07 : 1);
     this.fovNow = damp(this.fovNow, want, 12, dt);
     if (Math.abs(cam.fov - this.fovNow) > 0.01) { cam.fov = this.fovNow; cam.updateProjectionMatrix(); }
     cam.updateMatrixWorld();

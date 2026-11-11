@@ -282,7 +282,8 @@ function growTree(name, seed, detail = 0) {
     }
     if (p.y > height) height = p.y;
     const sides = lowDetail ? (depth === 0 ? 6 : 3) : (depth === 0 ? 10 : depth === 1 ? 7 : depth === 2 ? 5 : 3);
-    tube(pts, sides, y => clamp(y / 14, 0, 1), depth === 0 ? (name === 'banyan' ? 0.5 : 0.22) : 0);
+    // seen from outside the complex a tree is a trunk, its boughs and a crown: the twigs are behind the leaves
+    if (!(lowDetail && depth === S.depth && depth > 1)) tube(pts, sides, y => clamp(y / 14, 0, 1), depth === 0 ? (name === 'banyan' ? 0.5 : 0.22) : 0);
     if (depth === 1) limbs.push(pts);
     if (depth < S.depth) {
       const n = S.kids[depth] + (depth > 0 && rng() < 0.3 ? -1 : 0), phi0 = rng.range(0, TAU);
@@ -374,11 +375,11 @@ export class Vegetation {
     };
     this.mats.wood.map.wrapS = this.mats.wood.map.wrapT = THREE.RepeatWrapping;
     this.sets = {
-      grass: new CardSet(quadGeo('tuft'), this.mats.grass, { chunk: 24, maxDist: 135 }),
-      shrub: new CardSet(quadGeo('tuft'), this.mats.shrub, { chunk: 36, maxDist: 220, castShadow: true }),
-      wall: new CardSet(quadGeo('card'), this.mats.wall, { chunk: 40, maxDist: 320, castShadow: true }),
-      hang: new CardSet(quadGeo('hang'), this.mats.hang, { chunk: 40, maxDist: 260, castShadow: true }),
-      flat: new CardSet(quadGeo('flat'), this.mats.flat, { chunk: 40, maxDist: 200 }),
+      grass: new CardSet(quadGeo('tuft'), this.mats.grass, { chunk: 30, maxDist: 135 }),
+      shrub: new CardSet(quadGeo('tuft'), this.mats.shrub, { chunk: 68, maxDist: 220, castShadow: true }),
+      wall: new CardSet(quadGeo('card'), this.mats.wall, { chunk: 84, maxDist: 320, castShadow: true }),
+      hang: new CardSet(quadGeo('hang'), this.mats.hang, { chunk: 84, maxDist: 260, castShadow: true }),
+      flat: new CardSet(quadGeo('flat'), this.mats.flat, { chunk: 84, maxDist: 200 }),
     };
     this.trees = [];           // { x, z, y, r (crown radius), species }
     this.treeMeshes = [];
@@ -468,7 +469,8 @@ export class Vegetation {
     const variants = new Map();
     const get = (species, v, detail) => {
       const k = species + v + 'd' + detail;
-      if (!variants.has(k)) variants.set(k, { tree: growTree(species, 7919 * (v + 1) + species.length * 31, detail), spots: [], detail });
+      // on the lightest preset even the near trees are grown the cheap way: boughs and fewer, larger leaf cards
+      if (!variants.has(k)) variants.set(k, { tree: growTree(species, 7919 * (v + 1) + species.length * 31, species === 'sapling' ? detail : Math.max(detail, this.q.treeDetail || 0)), spots: [], detail });
       return variants.get(k);
     };
     for (const s of spots) {
@@ -486,7 +488,7 @@ export class Vegetation {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
     for (const V of variants.values()) {
       const regions = new Map();
-      const cell = V.detail ? 200 : 110;
+      const cell = V.detail ? 420 : 150;
       for (const s of V.spots) { const k = Math.floor((s.x + 400) / cell) + ',' + Math.floor((s.z + 400) / cell); if (!regions.has(k)) regions.set(k, []); regions.get(k).push(s); }
       for (const list of regions.values()) {
         for (const part of ['wood', 'leaves']) {
@@ -495,7 +497,7 @@ export class Vegetation {
           list.forEach((s, i) => { q.setFromAxisAngle(UP, s.yaw); sc.setScalar(s.scale); p.set(s.x, s.y, s.z); m4.compose(p, q, sc); im.setMatrixAt(i, m4); });
           im.instanceMatrix.needsUpdate = true;
           im.customDepthMaterial = (part === 'wood' ? this.mats.wood : this.mats.leaves).userData.depth;
-          im.castShadow = V.detail === 0; im.receiveShadow = true; im.matrixAutoUpdate = false;
+          im.castShadow = V.detail === 0 && (part === 'leaves' || this.q.trunkShadows); im.receiveShadow = true; im.matrixAutoUpdate = false;
           im.computeBoundingSphere();
           this.group.add(im); this.treeMeshes.push(im);
         }

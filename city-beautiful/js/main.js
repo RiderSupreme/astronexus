@@ -43,6 +43,8 @@ class Game {
   pickQuality() {
     const q = params.get('q') || this.settings.quality;
     if (QUALITY[q]) return q;
+    const learnt = store.get('city-beautiful-auto', null);          // what this machine settled on last time
+    if (QUALITY[learnt]) return learnt;
     const small = Math.min(screen.width, screen.height) < 700 || matchMedia('(pointer: coarse)').matches;
     return small ? 'low' : 'high';
   }
@@ -107,12 +109,22 @@ class Game {
     await nextFrame();
     this.sky.setTime(this.jd);
     this.update(0.016); this.render();
+    this.warm();
     addEventListener('resize', () => this.resize());
     // P works as a toggle; Esc can only pause, because a browser will not hand the mouse back on Esc
     addEventListener('keydown', e => { if (e.code === 'KeyP' && !e.repeat && this.state === 'paused') this.resume(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'playing') this.pause(); });
     this.resize();
     progress(1, 'Ready');
+  }
+
+  // Draw the whole place once from above with the beacon lit and once with it dark. Every shader the night will need
+  // is compiled here, behind the loading bar, instead of stalling the first glance round or the moment the lamp comes on.
+  warm() {
+    const cam = this.camera, pos = cam.position.clone(), quat = cam.quaternion.clone(), fov = cam.fov;
+    cam.position.set(0, 430, 40); cam.lookAt(0, 0, 0); cam.fov = 70; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+    for (const lit of [true, false]) { this.mission.beaconLights(lit); this.render(); }
+    cam.position.copy(pos); cam.quaternion.copy(quat); cam.fov = fov; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
   }
 
   resize() {
@@ -227,7 +239,14 @@ class Game {
     this.render();
     this.frames++;
     this.avgDt = this.avgDt * 0.96 + Math.min(raw, 100) * 0.04;
-    if (this.frames % 120 === 0 && this.state === 'playing' && !DEV) this.gfx.adapt(this.avgDt);
+    if (this.frames % 120 === 0 && this.state === 'playing' && !DEV) {
+      this.gfx.adapt(this.avgDt);
+      // still struggling at the smallest picture: give up a preset, and remember it for next time
+      if (this.avgDt > 30 && this.gfx.dynScale <= 0.56 && this.settings.quality === 'auto' && !params.get('q')) {
+        const next = { ultra: 'high', high: 'medium', medium: 'low' }[this.gfx.qualityName];
+        if (next) { store.set('city-beautiful-auto', next); this.gfx.dynScale = 0.85; this.gfx.setQuality(next); this.resize(); this.avgDt = 20; }
+      }
+    }
   }
 }
 

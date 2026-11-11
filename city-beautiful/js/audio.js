@@ -20,8 +20,8 @@ export class GameAudio {
     const comp = c.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 5; comp.attack.value = 0.003; comp.release.value = 0.2;
     this.master.connect(comp); comp.connect(c.destination);
     this.sfx = c.createGain(); this.sfx.connect(this.master);
-    this.amb = c.createGain(); this.amb.gain.value = 0.5; this.amb.connect(this.master);
-    this.music = c.createGain(); this.music.gain.value = this.musicVol * 0.5; this.music.connect(this.master);
+    this.amb = c.createGain(); this.amb.gain.value = 1.3; this.amb.connect(this.master);
+    this.music = c.createGain(); this.music.gain.value = this.musicVol; this.music.connect(this.master);
     // reverb: decaying noise as the impulse response of a very large, very hard room
     const len = Math.floor(c.sampleRate * 2.6), ir = c.createBuffer(2, len, c.sampleRate);
     for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); let lp = 0; for (let i = 0; i < len; i++) { const t = i / len; lp += ((Math.random() * 2 - 1) - lp) * (0.5 - 0.42 * t); d[i] = lp * Math.pow(1 - t, 2.6) * (i < 400 ? i / 400 : 1); } }
@@ -34,7 +34,7 @@ export class GameAudio {
     const nb = this.noise = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     this._ambience();
   }
-  setVolume(v, m) { this.vol = v; this.musicVol = m; if (this.ctx) { this.master.gain.value = v; this.music.gain.value = m * 0.5; } }
+  setVolume(v, m) { this.vol = v; this.musicVol = m; if (this.ctx) { this.master.gain.value = v; this.music.gain.value = m; } }
   suspend(on) { if (this.ctx) { if (on) this.ctx.suspend(); else this.ctx.resume(); } }
 
   // ---- building blocks ----
@@ -52,8 +52,8 @@ export class GameAudio {
     return o;
   }
   // A place in the world for a sound to come from.
-  _at(x, y, z, ref = 4, max = 90) {
-    const c = this.ctx, p = c.createPanner(); p.panningModel = 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = ref; p.maxDistance = max; p.rolloffFactor = 1.1;
+  _at(x, y, z, ref = 4, max = 90, roll = 1.1) {
+    const c = this.ctx, p = c.createPanner(); p.panningModel = 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = ref; p.maxDistance = max; p.rolloffFactor = roll;
     if (p.positionX) { p.positionX.value = x; p.positionY.value = y; p.positionZ.value = z; } else p.setPosition(x, y, z);
     p.connect(this.sfx); const send = c.createGain(); send.gain.value = 0.35; p.connect(send); send.connect(this.verb);
     return p;
@@ -88,9 +88,9 @@ export class GameAudio {
       case 'beacon': { const d = this._wet(0.6); this._tone(1.6, 'sawtooth', 60, 120, 0.2, d, 0, 0.6); this._tone(2.2, 'sine', 240, 480, 0.14, d, 0.3, 0.8); this._noise(0.3, 'bandpass', 3000, 800, 1, 0.3, d, 1.5); break; }
       case 'dawn': { const d = this._wet(0.8); for (const [i, st] of [0, 4, 7, 12].entries()) this._tone(5, 'sine', 138.6 * Math.pow(2, st / 12), 138.6 * Math.pow(2, st / 12), 0.13, d, i * 0.9, 1.2); break; }
       case 'hurt': this._noise(0.14, 'lowpass', 420, 120, 0.7, 0.9, s); this._tone(0.16, 'sine', 90, 45, 0.6, s); break;
-      case 'step_c': this._noise(0.05, 'bandpass', 900 * this.rng.range(0.85, 1.15), 400, 1, 0.13, s); this._noise(0.012, 'highpass', 3000, 3000, 0.5, 0.05, s); break;
-      case 'step_g': this._noise(0.11, 'highpass', 2200 * this.rng.range(0.8, 1.2), 3600, 0.5, 0.075, s, 0, 0.02); this._noise(0.05, 'lowpass', 260, 140, 0.7, 0.1, s); break;
-      case 'step_w': this._noise(0.2, 'bandpass', 700, 280, 0.9, 0.2, s, 0, 0.03); this._noise(0.12, 'highpass', 2600, 1500, 0.5, 0.06, s, 0.05); break;
+      case 'step_c': this._noise(0.05, 'bandpass', 900 * this.rng.range(0.85, 1.15), 400, 1, 0.2, s); this._noise(0.012, 'highpass', 3000, 3000, 0.5, 0.08, s); break;
+      case 'step_g': this._noise(0.11, 'highpass', 2200 * this.rng.range(0.8, 1.2), 3600, 0.5, 0.12, s, 0, 0.02); this._noise(0.05, 'lowpass', 260, 140, 0.7, 0.16, s); break;
+      case 'step_w': this._noise(0.2, 'bandpass', 700, 280, 0.9, 0.3, s, 0, 0.03); this._noise(0.12, 'highpass', 2600, 1500, 0.5, 0.09, s, 0.05); break;
       case 'land': this._noise(0.1, 'lowpass', 380, 110, 0.7, 0.45, s); break;
     }
   }
@@ -98,8 +98,8 @@ export class GameAudio {
     if (!this.ctx) return;
     const p = this._at(x, y, z);
     switch (name) {
-      case 'flesh': this._noise(0.07, 'lowpass', 700, 180, 0.8, 0.9, p); this._noise(0.1, 'bandpass', 1400, 500, 2, 0.35, p, 0.01); break;
-      case 'thud': this._noise(0.05, 'bandpass', 1500 * this.rng.range(0.8, 1.2), 600, 1.2, 0.7, p); break;
+      case 'flesh': this._noise(0.07, 'lowpass', 700, 180, 0.8, 2.0, p); this._noise(0.1, 'bandpass', 1400, 500, 2, 0.8, p, 0.01); break;
+      case 'thud': this._noise(0.05, 'bandpass', 1500 * this.rng.range(0.8, 1.2), 600, 1.2, 1.6, p); break;
       case 'ricochet': { const o = this._tone(0.28, 'sine', this.rng.range(2600, 3600), this.rng.range(900, 1500), 0.25, p); this._noise(0.03, 'highpass', 4000, 4000, 0.5, 0.5, p); break; }
       case 'splash': this._noise(0.3, 'bandpass', 1100, 320, 0.8, 0.7, p, 0, 0.02); break;
       case 'clink': this._tone(0.08, 'triangle', 1900, 1500, 0.3, p); break;
@@ -111,7 +111,7 @@ export class GameAudio {
   // ---- the infected ----
   infected(what, s) {
     if (!this.ctx || this.voices >= 7) return;
-    const c = this.ctx, r = this.rng, p = this._at(s.pos.x, s.pos.y + 1.5, s.pos.z, 3, 70), t = c.currentTime;
+    const c = this.ctx, r = this.rng, p = this._at(s.pos.x, s.pos.y + 1.5, s.pos.z, 6, 120, 0.9), t = c.currentTime;
     const big = s.kind === 'brute', base = (big ? 58 : s.kind === 'runner' ? 118 : 86) * r.range(0.85, 1.2);
     const dur = what === 'groan' ? r.range(0.8, 1.7) : what === 'attack' ? 0.42 : what === 'die' ? 1.1 : what === 'rise' ? 0.9 : 0.5;
     const o = c.createOscillator(); o.type = 'sawtooth';
@@ -122,7 +122,7 @@ export class GameAudio {
     const F1 = c.createBiquadFilter(), F2 = c.createBiquadFilter(); F1.type = F2.type = 'bandpass'; F1.Q.value = 5; F2.Q.value = 7;
     const a1 = r.range(480, 760), a2 = r.range(950, 1350);
     F1.frequency.setValueAtTime(a1, t); F1.frequency.linearRampToValueAtTime(a1 * r.range(0.7, 1.3), t + dur); F2.frequency.setValueAtTime(a2, t); F2.frequency.linearRampToValueAtTime(a2 * r.range(0.75, 1.25), t + dur);
-    const g = c.createGain(), peak = (what === 'attack' ? 0.9 : what === 'die' ? 0.75 : 0.5) * (big ? 1.4 : 1);
+    const g = c.createGain(), peak = (what === 'attack' ? 2.0 : what === 'die' ? 1.8 : 1.7) * (big ? 1.35 : 1);
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + dur * 0.18); g.gain.setValueAtTime(peak, t + dur * 0.55); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(F1); o.connect(F2); F1.connect(g); F2.connect(g); g.connect(p);
     this._noise(dur, 'bandpass', a2, a1, 1.5, peak * 0.22, p, 0, dur * 0.2);       // breath

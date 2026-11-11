@@ -150,21 +150,39 @@
   #touch .tb.use { left: 50%; margin-left: -1.65rem; bottom: calc(var(--gut-b) + 7.6rem); border-color: var(--pier-yellow); color: var(--pier-yellow); }
   #touch .tb.light { left: calc(var(--gut-l) + 0.2rem); top: calc(var(--gut-t) + 6.4rem); }
   #touch .tb.nade { left: calc(var(--gut-l) + 3.9rem); top: calc(var(--gut-t) + 6.4rem); }
-  #touch .tb.pause { right: var(--gut-r); top: calc(var(--gut-t) + 4.6rem); width: 2.6rem; height: 2.6rem; }
-  .touch .hud-bc { bottom: calc(var(--gut-b) + 11.6rem); }
+  #touch .tb.pause { right: var(--gut-r); top: calc(var(--gut-t) + 6.8rem); width: 3rem; height: 3rem; }
+  /* thumbs own the lower corners: what is said and what is prompted go between them, clear of the sights */
+  .touch .hud-bc { bottom: calc(var(--gut-b) + 0.2rem); width: min(26rem, 44vw); gap: 0.35rem; }
   .touch .hud-br { bottom: calc(var(--gut-b) + 0.2rem); }
-  .touch .hud-tr { display: none; }
+  .touch #slots { display: none; }
+  .touch #pickups { min-height: 0; }
   .touch .only-keys { display: none; }
   html:not(.touch) .only-touch { display: none; }
 
+  /* a phone held upright: the compass and objective drop under the clock, and the sun's curve gives way */
   @media (max-width: 620px) {
+    html { font-size: 14px; }
     body { font-size: 15px; }
-    .hud-tc { width: 54vw; }
-    #sun-dial { width: 6.6rem; height: 2.1rem; }
+    .hud-tc { top: calc(var(--gut-t) + 3.4rem); width: calc(100vw - var(--gut-l) - var(--gut-r)); }
+    #sun-dial, #clock-note { display: none; }
     #clock-time { font-size: 1.5rem; }
+    .touch .hud-bc { bottom: calc(var(--gut-b) + 5.6rem); width: min(26rem, 92vw); }
+    #touch .tb.pause { top: calc(var(--gut-t) + 9.4rem); }
+    #touch .tb.light, #touch .tb.nade { top: calc(var(--gut-t) + 9.4rem); }
     .screen.veil { background: #12130ed9; }
   }
-  @media (max-height: 460px) {
+  /* a phone held sideways: everything a size smaller */
+  @media (max-height: 520px) {
+    html { font-size: 14px; }
+    body { font-size: 15px; }
+    #clock-time { font-size: 1.6rem; }
+    #sun-dial { width: 7.6rem; height: 2.3rem; }
+    #objective { font-size: 1rem; }
+    #subtitle { font-size: 1rem; padding: 0.25rem 0.6rem; }
+    #prompt { font-size: 1rem; }
+    #ammo-mag { font-size: 2.5rem; }
+    #health-num { font-size: 2.1rem; }
+    .meter { width: 8rem; }
     .panel { gap: 0.6rem; }
     h1 { font-size: clamp(2.4rem, 13vh, 4rem); }
     .lede { font-size: 1rem; }
@@ -258,7 +276,7 @@
       <div class="only-keys"><kbd>F</kbd><span>Torch</span></div>
       <div class="only-keys"><kbd>V</kbd><span>Strike with the butt</span></div>
       <div class="only-keys"><kbd>G</kbd><span>Throw a grenade</span></div>
-      <div class="only-keys"><kbd>Esc</kbd><span>Pause</span></div>
+      <div class="only-keys"><kbd>P</kbd><span>Pause and resume (Esc pauses too)</span></div>
       <div class="only-touch"><kbd>Left thumb</kbd><span>Move; push right up to run</span></div>
       <div class="only-touch"><kbd>Right thumb</kbd><span>Look. The fire button aims as you hold it.</span></div>
       <div><kbd>Head</kbd><span>One round to the head puts most of them down</span></div>

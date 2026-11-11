@@ -6,7 +6,7 @@
 // when the Sun actually clears the horizon behind the High Court.
 import { THREE } from './lib/three.js';
 import { jdFromLocal, localHours } from './astro.js';
-import { standard } from './materials.js';
+import { standard, patch } from './materials.js';
 import { ARMS } from './weapons.js';
 import { STATE } from './zombies.js';
 import { START } from './world.js';
@@ -19,7 +19,7 @@ const hhmm = h => { h = mod(h, 24); return String(Math.floor(h)).padStart(2, '0'
 const BEAM_VERT = /* glsl */`varying float vT; varying vec3 vN; varying vec3 vV;
 void main() { vT = 0.5 - position.y; vec4 wp = modelMatrix * vec4(position, 1.0); vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }`;
 const BEAM_FRAG = /* glsl */`varying float vT; varying vec3 vN; varying vec3 vV; uniform float uI;
-void main() { float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.6); float a = edge * pow(1.0 - vT, 1.8) * smoothstep(0.0, 0.03, vT) * uI; gl_FragColor = vec4(vec3(1.0, 0.86, 0.6) * a, 1.0); }`;
+void main() { float edge = pow(abs(dot(normalize(vN), normalize(vV))), 2.4); float a = edge * (0.12 + 0.88 * pow(1.0 - vT, 2.6)) * smoothstep(0.0, 0.02, vT) * smoothstep(1.0, 0.75, vT) * uI; gl_FragColor = vec4(vec3(1.0, 0.86, 0.6) * a, 1.0); }`;
 
 export class Mission {
   constructor(game) {
@@ -29,6 +29,10 @@ export class Mission {
     const M = (color, o = {}) => standard({ color, roughness: 0.6, metalness: 0.1, ...o }, 'item');
     this.mat = { cell: M(0xc77a12), dark: M(0x15171a, { metalness: 0.6, roughness: 0.5 }), olive: M(0x2c331f), band: M(0xd9b23a), white: M(0xcfcabd), green: M(0x2f8a4a), steel: M(0x24262a, { metalness: 0.9, roughness: 0.45 }), wood: M(0x4a2c17),
       lampOff: M(0x3a0d0a, { emissive: 0xff2a10, emissiveIntensity: 0.6 }), lampOn: M(0x0c3a16, { emissive: 0x38ff70, emissiveIntensity: 3 }) };
+    // every pickup is one mesh: its colours ride on the vertices, and anything brighter than white glows
+    this.itemMat = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.25 }),
+      { key: 'pickup', fragEmissive: 'totalEmissiveRadiance += vColor * step(1.2, max(vColor.r, max(vColor.g, vColor.b)));' });
+    this.geos = {};
     // a faint column of light over anything worth picking up, so it can be found in long grass
     this.markMat = new THREE.MeshBasicMaterial({ color: 0xe8b93b, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
     this.markGeo = new THREE.CylinderGeometry(0.02, 0.07, 1.5, 8, 1, true);
@@ -39,17 +43,31 @@ export class Mission {
 
   // ---- things that can be picked up ----
   _model(type, kind) {
-    const g = new THREE.Group(), m = this.mat, B = (mat, w, h, d, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
-    if (type === 'cell') { B(m.cell, 0.42, 0.26, 0.24, 0, 0.13); B(m.dark, 0.05, 0.3, 0.26, -0.21, 0.14); B(m.dark, 0.05, 0.3, 0.26, 0.21, 0.14); B(m.dark, 0.3, 0.03, 0.03, 0, 0.3); B(m.lampOn, 0.1, 0.03, 0.01, 0, 0.18, 0.125); }
-    else if (type === 'ammo') { B(m.olive, 0.3, 0.17, 0.16, 0, 0.085); B(m.band, 0.31, 0.03, 0.165, 0, 0.11); B(m.dark, 0.1, 0.02, 0.03, 0, 0.18); }
-    else if (type === 'med') { B(m.white, 0.3, 0.2, 0.12, 0, 0.1); B(m.green, 0.05, 0.14, 0.125, 0, 0.1); B(m.green, 0.14, 0.05, 0.125, 0, 0.1); }
-    else if (type === 'grenade') { const s = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), m.olive); s.position.y = 0.06; g.add(s); B(m.dark, 0.03, 0.04, 0.03, 0, 0.13); }
-    else if (type === 'weapon') {
-      if (kind === 'rifle') { B(m.steel, 0.05, 0.07, 0.3, 0, 0.05, 0); B(m.wood, 0.045, 0.05, 0.26, 0, 0.055, -0.27); B(m.steel, 0.02, 0.02, 0.3, 0, 0.06, -0.52); B(m.wood, 0.04, 0.08, 0.28, 0, 0.04, 0.28); B(m.steel, 0.03, 0.14, 0.05, 0, -0.04, -0.03); }
-      else { B(m.steel, 0.05, 0.065, 0.24, 0, 0.05, 0); B(m.steel, 0.024, 0.024, 0.55, 0, 0.065, -0.38); B(m.wood, 0.05, 0.05, 0.17, 0, 0.035, -0.27); B(m.wood, 0.04, 0.075, 0.3, 0, 0.035, 0.26); }
-      g.rotation.z = Math.PI / 2 * 0.92;
+    const key = type + (kind || '');
+    if (!this.geos[key]) {
+      const parts = [], C = { cell: 0xc77a12, dark: 0x15171a, olive: 0x2c331f, band: 0xd9b23a, white: 0xcfcabd, green: 0x2f8a4a, steel: 0x24262a, wood: 0x4a2c17 }, col = new THREE.Color();
+      const add = (c, g) => { const rgb = Array.isArray(c) ? c : col.set(C[c]).toArray(); parts.push([g.toNonIndexed(), rgb]); };
+      const B = (c, w, h, d, x = 0, y = 0, z = 0) => add(c, new THREE.BoxGeometry(w, h, d).translate(x, y, z));
+      if (type === 'cell') { B('cell', 0.42, 0.26, 0.24, 0, 0.13); B('dark', 0.05, 0.3, 0.26, -0.21, 0.14); B('dark', 0.05, 0.3, 0.26, 0.21, 0.14); B('dark', 0.3, 0.03, 0.03, 0, 0.3); B([0.15, 3.2, 0.5], 0.1, 0.03, 0.01, 0, 0.18, 0.125); }
+      else if (type === 'ammo') { B('olive', 0.3, 0.17, 0.16, 0, 0.085); B('band', 0.31, 0.03, 0.165, 0, 0.11); B('dark', 0.1, 0.02, 0.03, 0, 0.18); }
+      else if (type === 'med') { B('white', 0.3, 0.2, 0.12, 0, 0.1); B('green', 0.05, 0.14, 0.125, 0, 0.1); B('green', 0.14, 0.05, 0.125, 0, 0.1); }
+      else if (type === 'grenade') { add('olive', new THREE.SphereGeometry(0.06, 10, 8).translate(0, 0.06, 0)); B('dark', 0.03, 0.04, 0.03, 0, 0.13); }
+      else if (kind === 'rifle') { B('steel', 0.05, 0.07, 0.3, 0, 0.05, 0); B('wood', 0.045, 0.05, 0.26, 0, 0.055, -0.27); B('steel', 0.02, 0.02, 0.3, 0, 0.06, -0.52); B('wood', 0.04, 0.08, 0.28, 0, 0.04, 0.28); B('steel', 0.03, 0.14, 0.05, 0, -0.04, -0.03); }
+      else { B('steel', 0.05, 0.065, 0.24, 0, 0.05, 0); B('steel', 0.024, 0.024, 0.55, 0, 0.065, -0.38); B('wood', 0.05, 0.05, 0.17, 0, 0.035, -0.27); B('wood', 0.04, 0.075, 0.3, 0, 0.035, 0.26); }
+      const n = parts.reduce((a, [g]) => a + g.attributes.position.count, 0), pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3), rgb = new Float32Array(n * 3);
+      let o = 0;
+      for (const [g, c] of parts) {
+        pos.set(g.attributes.position.array, o * 3); nrm.set(g.attributes.normal.array, o * 3);
+        for (let i = 0; i < g.attributes.position.count; i++) rgb.set(c, (o + i) * 3);
+        o += g.attributes.position.count; g.dispose();
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3)); geo.setAttribute('color', new THREE.BufferAttribute(rgb, 3));
+      if (type === 'weapon') geo.rotateZ(Math.PI / 2 * 0.92);        // a gun left lying on its side
+      this.geos[key] = geo;
     }
-    return g;
+    const mesh = new THREE.Mesh(this.geos[key], this.itemMat); mesh.castShadow = true;
+    return mesh;
   }
   place(type, x, z, { kind = null, amount = 0, y = null, use = false, label = '' } = {}) {
     const W = this.game.world;
@@ -109,7 +127,10 @@ export class Mission {
       }
     }
     this.lit = 0;
+    this.beaconLights(false);
   }
+  // The beacon's lamps are left out of the lighting altogether until they are lit: a dark lamp still costs every pixel its sums.
+  beaconLights(on) { this.glow.visible = on; for (const b of this.beams) b.visible = on; }
 
   // ---- lifecycle ----
   reset() {
@@ -119,6 +140,8 @@ export class Mission {
     H.clear(); H.killed = 0; H.headshots = 0; H.awakeAll = false;
     this.phase = 'salvage'; this.cells = 0; this.t = 0; this.siegeT = 0; this.nightfall = false; this.spawnT = 3; this.debt = 0; this.holdT = 0; this.resupplyT = 70;
     this.said = {}; this.damageTaken = 0; this.lit = 0; this.dawnT = 0; this.lastHealth = 100;
+    this.lampMat.color.setRGB(0, 0, 0); this.glow.intensity = 0; this.beamMat.uniforms.uI.value = 0; for (const b of this.beams) b.intensity = 0;
+    this.beaconLights(false);
     for (const l of this.lamps) l.material = this.mat.lampOff;
     G.jd = jdFromLocal(2087, 9, 23, 17 + 25 / 60); G.clockRate = 5 / 3600;
     G.sky.cloudCover = 0.42; G.sky.haze = 0.35;
@@ -214,8 +237,10 @@ export class Mission {
     let focus = null, fd = 2.3;
     for (const it of this.items) {
       if (it.taken) continue;
-      it.mesh.children[1].rotation.y += dt * 0.8;
       const d = Math.hypot(it.x - p.pos.x, it.z - p.pos.z), dy = Math.abs(it.y - p.pos.y);
+      it.mesh.visible = d < 110;                      // nothing this small is seen from further off
+      if (!it.mesh.visible) continue;
+      it.mesh.children[1].rotation.y += dt * 0.8;
       if (dy > 2.2) continue;
       if (it.use) { if (d < fd) { fd = d; focus = it; } }
       else if (d < 1.25 && p.alive) this._take(it);
@@ -250,7 +275,7 @@ export class Mission {
       if (f > 0.5 && !this.said.half) { this.said.half = true; hud.say(RELAY, 'Halfway to sunrise. The big ones are coming in. Keep the court.'); }
       if (f > 0.86 && !this.said.grey) { this.said.grey = true; hud.say(RELAY, 'East is going grey. A few more minutes.'); }
       this.resupplyT -= dt;
-      if (this.resupplyT <= 0) { this.resupplyT = 55; let any = false; for (const it of this.cache) if (it.taken) { it.taken = false; it.mesh.visible = true; any = true; } if (any) { hud.feed('CACHE RESTOCKED'); G.audio?.play('pickup'); } }
+      if (this.resupplyT <= 0) { this.resupplyT = 55; let any = false; for (const it of this.cache) if (it.taken) { it.taken = false; any = true; } if (any) { hud.feed('CACHE RESTOCKED'); G.audio?.play('pickup'); } }
       if (sunAlt > -0.85 && f > 0.5) this._dawn();
     } else if (this.nightfall && this.phase !== 'dawn' && this.phase !== 'done') { want = 5 + this.cells; gap = 3.2; }
     this.spawnT -= dt;
@@ -265,7 +290,7 @@ export class Mission {
       this.lit = Math.min(1, this.lit + dt * 0.5);
       this.turret.rotation.y += dt * 0.62;
       const flick = 0.92 + 0.08 * Math.sin(this.t * 31), k = this.lit * flick * (this.phase === 'dawn' || this.phase === 'done' ? Math.max(0.15, 1 - this.dawnT / 8) : 1);
-      this.lampMat.color.setRGB(60 * k, 46 * k, 26 * k); this.glow.intensity = 320 * k; this.beamMat.uniforms.uI.value = 0.6 * k * (0.35 + 0.65 * sky.night);
+      this.lampMat.color.setRGB(60 * k, 46 * k, 26 * k); this.glow.intensity = 320 * k; this.beamMat.uniforms.uI.value = 0.3 * k * (0.3 + 0.7 * sky.night) / Math.max(0.4, G.gfx.post.uExposure.value);
       for (const b of this.beams) b.intensity = 7000 * k;
     }
     // --- sunrise
@@ -275,6 +300,7 @@ export class Mission {
   _light() {
     const G = this.game, hud = G.hud;
     this.phase = 'siege'; this.siegeT = 0; this.lit = 0.01; this.holdT = 0; this.spawnT = 4;
+    this.beaconLights(true);
     for (const l of this.lamps) l.material = this.mat.lampOn;
     // from now the night runs out in a fixed span of real time, ending when the Sun clears the horizon
     const rise = jdFromLocal(2087, 9, 23, 0) + (hud.sunrise + 0.02) / 24;

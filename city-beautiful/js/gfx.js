@@ -128,10 +128,10 @@ void main() {
 }`;
 
 export const QUALITY = {
-  low:    { label: 'Low',    pixelRatio: 1.0,  scale: 0.75, msaa: 0, shadow: 1024, shadowRange: 55,  bloom: true, bloomMips: 4, shafts: false, grass: 0.35, trees: 0.6, particles: 0.5, far: 520 },
-  medium: { label: 'Medium', pixelRatio: 1.25, scale: 1.0,  msaa: 2, shadow: 2048, shadowRange: 80,  bloom: true, bloomMips: 5, shafts: true,  grass: 0.65, trees: 0.85, particles: 0.8, far: 700 },
-  high:   { label: 'High',   pixelRatio: 1.5,  scale: 1.0,  msaa: 4, shadow: 2048, shadowRange: 95,  bloom: true, bloomMips: 6, shafts: true,  grass: 1.0,  trees: 1.0, particles: 1.0, far: 900 },
-  ultra:  { label: 'Ultra',  pixelRatio: 2.0,  scale: 1.0,  msaa: 4, shadow: 4096, shadowRange: 120, bloom: true, bloomMips: 6, shafts: true,  grass: 1.5,  trees: 1.0, particles: 1.3, far: 1100 },
+  low:    { label: 'Low',    pixelRatio: 1.0,  scale: 0.75, msaa: 0, shadow: 1024, shadowRange: 55,  bloom: true, bloomMips: 4, shafts: false, grass: 0.35, trees: 0.6, particles: 0.5, far: 520, trunkShadows: false, treeDetail: 1 },
+  medium: { label: 'Medium', pixelRatio: 1.25, scale: 1.0,  msaa: 2, shadow: 2048, shadowRange: 80,  bloom: true, bloomMips: 5, shafts: true,  grass: 0.65, trees: 0.85, particles: 0.8, far: 700, trunkShadows: false },
+  high:   { label: 'High',   pixelRatio: 1.5,  scale: 1.0,  msaa: 4, shadow: 2048, shadowRange: 95,  bloom: true, bloomMips: 6, shafts: true,  grass: 1.0,  trees: 1.0, particles: 1.0, far: 900, trunkShadows: true },
+  ultra:  { label: 'Ultra',  pixelRatio: 2.0,  scale: 1.0,  msaa: 4, shadow: 4096, shadowRange: 120, bloom: true, bloomMips: 6, shafts: true,  grass: 1.5,  trees: 1.0, particles: 1.3, far: 1100, trunkShadows: true },
 };
 
 export class Gfx {

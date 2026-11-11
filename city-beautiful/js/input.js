@@ -37,6 +37,8 @@ export class Input {
 
     canvas.addEventListener('mousedown', e => {
       if (!this.enabled) return;
+      // a real mouse on a machine that also has a touch screen: go back to mouse and keys
+      if (this.touch) { if (performance.now() - this.lastTouch < 900) return; this.setTouch(false); }
       if (e.button === 0) { this.held.fire = true; this.pressed.fire = true; }
       if (e.button === 2) { this.held.aim = true; this.pressed.aim = true; }
       if (!this.locked && !this.lockFailed && !this.touch) this.lock();
@@ -55,7 +57,19 @@ export class Input {
     });
     document.addEventListener('pointerlockerror', () => this._lockRefused());
 
+    // any finger anywhere, a menu button included, means thumbs will be doing the playing
+    this.lastTouch = -1e9;
+    document.addEventListener('touchstart', () => { this.lastTouch = performance.now(); this.setTouch(true); }, { capture: true, passive: true });
+    document.addEventListener('touchend', () => { this.lastTouch = performance.now(); }, { capture: true, passive: true });
     if (touchRoot) this._initTouch(touchRoot);
+  }
+
+  setTouch(on) {
+    if (this.touch === on) return;
+    this.touch = on;
+    document.documentElement.classList.toggle('touch', on);
+    if (this.touchRoot) this.touchRoot.hidden = !(on && this.enabled);
+    if (on) this.unlock(); else { this.moveX = this.moveZ = 0; }
   }
 
   // Ask the browser to capture the mouse. Must be called from a click. Browsers refuse a request made
@@ -93,7 +107,7 @@ export class Input {
     let moveId = null, lookId = null, mox = 0, moy = 0, lx = 0, ly = 0;
     const R = 56;
     const start = e => {
-      if (!this.touch) { this.touch = true; root.hidden = false; document.documentElement.classList.add('touch'); }
+      this.setTouch(true);
       if (!this.enabled) return;
       for (const t of e.changedTouches) {
         const btn = t.target.closest && t.target.closest('[data-act]');
