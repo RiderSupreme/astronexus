@@ -18,9 +18,9 @@ const VSTEPS = 20, LSTEPS = 6;
 
 export const SUN_E0 = 20;         // solar irradiance above the atmosphere, in scene units
 export const MOON_E0 = 0.5;       // full-moon irradiance; far brighter than life so nights stay playable
-const NIGHT_FLOOR = [0.0085, 0.0112, 0.019];   // starlight and airglow, likewise lifted
+const NIGHT_FLOOR = [0.0115, 0.0152, 0.026];   // starlight and airglow, likewise lifted
 // Exposure by solar altitude (degrees): the eye opening up through dusk.
-const EXPOSURE_KEYS = [[-14, 2.7], [-9, 2.0], [-5, 1.3], [-2, 0.85], [0, 0.62], [4, 0.5], [10, 0.42], [25, 0.34]];
+const EXPOSURE_KEYS = [[-14, 2.9], [-9, 2.0], [-5, 1.3], [-2, 0.85], [0, 0.62], [4, 0.5], [10, 0.42], [25, 0.34]];
 function exposureAt(altDeg) {
   const K = EXPOSURE_KEYS;
   if (altDeg <= K[0][0]) return K[0][1];
@@ -355,6 +355,7 @@ export class Sky {
     this.zenith = new THREE.Color(); this.horizon = new THREE.Color(); this.ambientLum = 0;
     this.shaftColor = new THREE.Color(1, 1, 1); this.shaftStrength = 0;
     this.flash = 0;                   // lightning, 0..1
+    this.headless = false;            // tests: skip the GPU work of re-rendering the sky
     this.overcast = 0;                // 0 clear .. 1 storm: thickens cloud, dims the sun
     this._lutKey = null; this._envKey = null; this._envTimer = 0;
 
@@ -487,7 +488,7 @@ export class Sky {
 
     // --- sky lookup, only when something moved
     const lutKey = `${(a.sunAlt / DEG).toFixed(2)}|${(a.sunAz / DEG).toFixed(1)}|${(a.moonAlt / DEG).toFixed(1)}|${(a.moonAz / DEG).toFixed(0)}|${mieB.toExponential(2)}|${moonPower.toFixed(2)}|${this.flash.toFixed(2)}`;
-    if (lutKey !== this._lutKey) {
+    if (lutKey !== this._lutKey && !this.headless) {
       this._lutKey = lutKey;
       const u = this.lutMat.uniforms;
       u.uSunDir.value.copy(a.sunDir); u.uMoonDir.value.copy(a.moonDir);
@@ -564,7 +565,7 @@ export class Sky {
     // --- ambient environment, re-filtered when the sky has changed enough to see
     this._envTimer -= dt;
     const envKey = `${(a.sunAlt / DEG / 0.6).toFixed(0)}|${(a.sunAz / DEG / 4).toFixed(0)}|${(moonPower * 10).toFixed(0)}|${(a.moonAlt / DEG / 3).toFixed(0)}|${(this.haze * 10).toFixed(0)}|${(cover * 8).toFixed(0)}|${(this.flash * 4).toFixed(0)}`;
-    if (envKey !== this._envKey && this._envTimer <= 0) {
+    if (envKey !== this._envKey && this._envTimer <= 0 && !this.headless) {
       this._envKey = envKey; this._envTimer = 0.35;
       this._renderEnv(cover);
     }

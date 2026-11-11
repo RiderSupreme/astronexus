@@ -2,12 +2,315 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <title>City Beautiful</title>
-<style>html,body{height:100%;margin:0;background:#12130f}canvas{position:fixed;inset:0;width:100%;height:100%;display:block}</style>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="A first-person shooter set in Chandigarh's Capitol Complex, sixty monsoons after the city was abandoned.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@700;900&family=Barlow+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Teko:wght@500;600&family=Noto+Sans+Gurmukhi:wght@600&display=swap">
+<style>
+  /* Layout: the 3D view fills the screen; everything else is stencilled into its corners,
+     like formwork marks on raw concrete. One committed dark look. Colours come from the
+     Capitol itself: sunlit béton brut, and the three painted piers of the High Court. */
+  :root {
+    color-scheme: dark;
+    --beton: #dcd6c8;          /* raw concrete in evening sun: text */
+    --beton-dim: #9b968a;      /* the same in shade: secondary text */
+    --shade: #12130e;          /* under the banyans: page and panels */
+    --shade-2: #1e2018;
+    --line: #dcd6c838;
+    --pier-yellow: #e8b93b;    /* High Court pier: objectives, selection */
+    --pier-red: #d7553f;       /* High Court pier: harm */
+    --pier-green: #74ab77;     /* High Court pier: health */
+    --enamel: #8ab6d1;         /* Assembly door enamel: information */
+    --font-display: 'Big Shoulders Stencil', 'Arial Narrow', Impact, sans-serif;
+    --font-body: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+    --font-data: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+    --gut-l: max(16px, env(safe-area-inset-left, 0px));
+    --gut-r: max(16px, env(safe-area-inset-right, 0px));
+    --gut-t: max(14px, env(safe-area-inset-top, 0px));
+    --gut-b: max(14px, env(safe-area-inset-bottom, 0px));
+  }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--shade); color: var(--beton); font-family: var(--font-body); font-size: 17px; line-height: 1.35; overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+  [hidden] { display: none !important; }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: var(--shade); touch-action: none; }
+  button, select, input { font: inherit; color: inherit; }
+
+  /* ---- screens ---- */
+  .screen { position: fixed; inset: 0; z-index: 30; display: grid; overflow-y: auto; padding: var(--gut-t) var(--gut-r) var(--gut-b) var(--gut-l); touch-action: pan-y; }
+  .screen.veil { background: linear-gradient(90deg, #12130ef2 0%, #12130ecc 38%, #12130e33 72%, #12130e00 100%); }
+  .screen.full { background: #12130ed9; }
+  .panel { align-self: center; max-width: 34rem; display: flex; flex-direction: column; gap: 1.1rem; padding-block: 1rem; min-width: 0; }
+  .screen.full .panel { justify-self: center; text-align: left; width: 100%; }
+  .eyebrow { font-family: var(--font-data); font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--beton-dim); }
+  h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(3rem, 11vw, 6.2rem); line-height: 0.86; letter-spacing: 0.01em; margin: 0; text-transform: uppercase; text-wrap: balance; }
+  h1 span { color: var(--pier-yellow); }
+  h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(2.2rem, 7vw, 3.6rem); line-height: 0.9; margin: 0; text-transform: uppercase; text-wrap: balance; }
+  .lede { font-size: 1.14rem; max-width: 30rem; color: var(--beton); margin: 0; }
+  .lede + .lede { color: var(--beton-dim); }
+  .row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+  .btn { appearance: none; border: 1.5px solid var(--line); background: #dcd6c80d; padding: 0.62rem 1.15rem; font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; border-radius: 0; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+  .btn:hover { background: #dcd6c81f; border-color: var(--beton-dim); }
+  .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--pier-yellow); outline-offset: 2px; }
+  .btn.go { background: var(--pier-yellow); border-color: var(--pier-yellow); color: var(--shade); padding-inline: 1.8rem; }
+  .btn.go:hover { background: #f3cb5a; }
+  .btn.quiet { border-color: transparent; background: none; color: var(--beton-dim); padding-inline: 0.4rem; font-size: 1.1rem; }
+  .btn.quiet:hover { color: var(--beton); }
+  .sheet { border-top: 1.5px solid var(--line); padding-top: 0.9rem; display: grid; gap: 0.5rem 1.4rem; }
+  .keys { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); font-size: 1rem; }
+  .keys div { display: flex; gap: 0.6rem; align-items: baseline; min-width: 0; }
+  kbd { font-family: var(--font-data); font-size: 0.74rem; border: 1px solid var(--line); padding: 0.1rem 0.36rem; color: var(--beton); white-space: nowrap; flex: none; }
+  .keys span { color: var(--beton-dim); }
+  .opts { grid-template-columns: minmax(7rem, auto) 1fr; align-items: center; font-size: 1.02rem; }
+  .opts label { color: var(--beton-dim); }
+  .opts select { background: var(--shade-2); border: 1px solid var(--line); padding: 0.3rem 0.5rem; border-radius: 0; max-width: 14rem; }
+  .opts input[type=range] { width: 100%; max-width: 14rem; accent-color: var(--pier-yellow); }
+  .opts input[type=checkbox] { width: 1.1rem; height: 1.1rem; accent-color: var(--pier-yellow); justify-self: start; }
+  .fine { font-family: var(--font-data); font-size: 0.7rem; letter-spacing: 0.04em; color: var(--beton-dim); max-width: 32rem; margin: 0; line-height: 1.5; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.9rem 1.4rem; border-block: 1.5px solid var(--line); padding-block: 0.9rem; }
+  .stats div { display: flex; flex-direction: column; min-width: 0; }
+  .stats b { font-family: var(--font-display); font-weight: 700; font-size: 2.1rem; line-height: 1; font-variant-numeric: tabular-nums; }
+  .stats span { font-family: var(--font-data); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--beton-dim); }
+
+  /* loading */
+  #loading { background: var(--shade); z-index: 40; }
+  #loading .panel { justify-self: start; }
+  .bar { height: 3px; background: var(--line); width: min(100%, 22rem); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--pier-yellow); transform-origin: left; transform: scaleX(0); transition: transform 0.25s; }
+  #load-label { font-family: var(--font-data); font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--beton-dim); min-height: 1.2em; }
+
+  /* ---- HUD ---- */
+  #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px #000c; }
+  .hud-tl, .hud-tr, .hud-bl, .hud-br, .hud-tc, .hud-bc { position: absolute; display: flex; flex-direction: column; gap: 0.25rem; }
+  .hud-tl { top: var(--gut-t); left: var(--gut-l); }
+  .hud-tr { top: var(--gut-t); right: var(--gut-r); align-items: flex-end; }
+  .hud-bl { bottom: var(--gut-b); left: var(--gut-l); }
+  .hud-br { bottom: var(--gut-b); right: var(--gut-r); align-items: flex-end; }
+  .hud-tc { top: var(--gut-t); left: 50%; transform: translateX(-50%); align-items: center; width: min(46rem, 62vw); }
+  .hud-bc { bottom: calc(var(--gut-b) + 3.6rem); left: 50%; transform: translateX(-50%); align-items: center; width: min(40rem, 86vw); text-align: center; gap: 0.6rem; }
+  .tag { font-family: var(--font-data); font-size: 0.64rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--beton-dim); }
+  #clock-time { font-family: var(--font-display); font-weight: 700; font-size: 2rem; line-height: 0.9; }
+  #sun-dial { width: 9.5rem; height: 2.9rem; display: block; }
+  #compass { width: 100%; height: 2.3rem; display: block; }
+  #objective { font-size: 1.12rem; font-weight: 500; text-align: center; letter-spacing: 0.02em; }
+  #objective b { color: var(--pier-yellow); font-weight: 600; }
+  #cells { display: flex; gap: 0.3rem; }
+  #cells i { width: 0.95rem; height: 0.6rem; border: 1.5px solid var(--beton-dim); }
+  #cells i.on { background: var(--pier-yellow); border-color: var(--pier-yellow); }
+  #health { display: flex; align-items: flex-end; gap: 0.6rem; }
+  #health-num { font-family: var(--font-display); font-weight: 700; font-size: 2.6rem; line-height: 0.8; min-width: 2.2ch; }
+  .meter { width: 11rem; max-width: 34vw; height: 0.5rem; background: #0008; outline: 1px solid var(--line); }
+  .meter i { display: block; height: 100%; background: var(--pier-green); transform-origin: left; }
+  .meter.thin { height: 0.2rem; margin-top: 0.3rem; }
+  .meter.thin i { background: var(--beton); }
+  #health.low #health-num, #health.low .tag { color: var(--pier-red); }
+  #health.low .meter:not(.thin) i { background: var(--pier-red); }
+  #ammo { display: flex; align-items: baseline; gap: 0.35rem; }
+  #ammo-mag { font-family: var(--font-display); font-weight: 700; font-size: 3.2rem; line-height: 0.8; }
+  #ammo-mag.dry { color: var(--pier-red); }
+  #ammo-res { font-family: var(--font-data); font-size: 1rem; color: var(--beton-dim); }
+  #weapon-name { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; letter-spacing: 0.08em; }
+  #slots { display: flex; gap: 0.3rem; font-family: var(--font-data); font-size: 0.68rem; }
+  #slots i { font-style: normal; border: 1px solid var(--line); padding: 0 0.32rem; color: var(--beton-dim); opacity: 0.35; }
+  #slots i.own { opacity: 1; }
+  #slots i.on { background: var(--beton); color: var(--shade); border-color: var(--beton); text-shadow: none; }
+  #cross { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+  #cross i { position: absolute; background: var(--beton); box-shadow: 0 0 2px #000; }
+  #cross i:nth-child(1), #cross i:nth-child(2) { width: 2px; height: 9px; left: -1px; }
+  #cross i:nth-child(3), #cross i:nth-child(4) { height: 2px; width: 9px; top: -1px; }
+  #cross b { position: absolute; left: -1.5px; top: -1.5px; width: 3px; height: 3px; background: var(--beton); border-radius: 50%; box-shadow: 0 0 2px #000; }
+  #hitmark { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px; opacity: 0; background:
+    linear-gradient(45deg, transparent 46%, currentColor 46% 54%, transparent 54%), linear-gradient(-45deg, transparent 46%, currentColor 46% 54%, transparent 54%); -webkit-mask: radial-gradient(circle, transparent 5px, #000 6px); mask: radial-gradient(circle, transparent 5px, #000 6px); color: var(--beton); }
+  #hurt { position: absolute; left: 50%; top: 50%; width: 15rem; height: 15rem; margin: -7.5rem; opacity: 0; border-radius: 50%; background: conic-gradient(from -28deg, var(--pier-red) 0deg, var(--pier-red) 56deg, transparent 56deg); -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%, #000 69%, transparent 71%); mask: radial-gradient(circle, transparent 62%, #000 64%, #000 69%, transparent 71%); }
+  #prompt { font-size: 1.15rem; font-weight: 500; background: #12130eb8; padding: 0.3rem 0.8rem; border-left: 3px solid var(--pier-yellow); }
+  #prompt kbd { font-size: 0.8rem; margin-right: 0.5rem; border-color: var(--beton-dim); }
+  #hold { width: 9rem; height: 3px; background: var(--line); }
+  #hold i { display: block; height: 100%; background: var(--pier-yellow); transform-origin: left; transform: scaleX(0); }
+  #subtitle { font-size: 1.16rem; line-height: 1.3; max-width: 36rem; background: #12130eb8; padding: 0.4rem 0.9rem; text-wrap: balance; }
+  #subtitle b { font-family: var(--font-data); font-size: 0.66rem; letter-spacing: 0.16em; color: var(--enamel); display: block; font-weight: 500; }
+  #banner { position: absolute; left: 0; right: 0; top: 22%; text-align: center; opacity: 0; transition: opacity 0.6s; padding-inline: var(--gut-l) var(--gut-r); }
+  #banner.on { opacity: 1; }
+  #banner b { display: block; font-family: var(--font-display); font-weight: 900; font-size: clamp(2.6rem, 9vw, 6rem); line-height: 0.9; letter-spacing: 0.04em; }
+  #banner span { font-family: var(--font-data); font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--beton-dim); }
+  #pickups { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; font-family: var(--font-data); font-size: 0.74rem; color: var(--pier-yellow); min-height: 3.2em; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 20; transition: opacity 1.2s; }
+
+  /* ---- touch ---- */
+  #touch { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+  #touch [data-stick] { position: absolute; width: 112px; height: 112px; margin: -56px; border: 1.5px solid var(--line); border-radius: 50%; opacity: 0; transition: opacity 0.15s; }
+  #touch [data-stick].on { opacity: 1; }
+  #touch [data-stick] i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px; border-radius: 50%; background: #dcd6c855; }
+  #touch .tb { position: absolute; pointer-events: auto; display: grid; place-items: center; border: 1.5px solid var(--line); background: #12130e66; border-radius: 50%; font-family: var(--font-data); font-size: 0.62rem; letter-spacing: 0.08em; color: var(--beton); width: 3.3rem; height: 3.3rem; }
+  #touch .tb.on { background: #dcd6c84d; }
+  #touch .tb.fire { width: 5rem; height: 5rem; right: calc(var(--gut-r) + 1rem); bottom: calc(var(--gut-b) + 5.2rem); border-color: var(--pier-red); color: var(--pier-red); }
+  #touch .tb.aim { right: calc(var(--gut-r) + 6.6rem); bottom: calc(var(--gut-b) + 4rem); }
+  #touch .tb.jump { right: calc(var(--gut-r) + 0.2rem); bottom: calc(var(--gut-b) + 11rem); }
+  #touch .tb.reload { right: calc(var(--gut-r) + 4.3rem); bottom: calc(var(--gut-b) + 10.2rem); }
+  #touch .tb.swap { right: calc(var(--gut-r) + 8.2rem); bottom: calc(var(--gut-b) + 8.4rem); }
+  #touch .tb.use { left: 50%; margin-left: -1.65rem; bottom: calc(var(--gut-b) + 7.6rem); border-color: var(--pier-yellow); color: var(--pier-yellow); }
+  #touch .tb.light { left: calc(var(--gut-l) + 0.2rem); top: calc(var(--gut-t) + 6.4rem); }
+  #touch .tb.nade { left: calc(var(--gut-l) + 3.9rem); top: calc(var(--gut-t) + 6.4rem); }
+  #touch .tb.pause { right: var(--gut-r); top: calc(var(--gut-t) + 4.6rem); width: 2.6rem; height: 2.6rem; }
+  .touch .hud-bc { bottom: calc(var(--gut-b) + 11.6rem); }
+  .touch .hud-br { bottom: calc(var(--gut-b) + 0.2rem); }
+  .touch .hud-tr { display: none; }
+  .touch .only-keys { display: none; }
+  html:not(.touch) .only-touch { display: none; }
+
+  @media (max-width: 620px) {
+    body { font-size: 15px; }
+    .hud-tc { width: 54vw; }
+    #sun-dial { width: 6.6rem; height: 2.1rem; }
+    #clock-time { font-size: 1.5rem; }
+    .screen.veil { background: #12130ed9; }
+  }
+  @media (max-height: 460px) {
+    .panel { gap: 0.6rem; }
+    h1 { font-size: clamp(2.4rem, 13vh, 4rem); }
+    .lede { font-size: 1rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
 </head>
 <body>
-<canvas id="view"></canvas>
+<canvas id="view" aria-label="City Beautiful game view"></canvas>
+
+<div id="hud" hidden>
+  <div class="hud-tl">
+    <span class="tag" id="clock-date">23 SEP 2087</span>
+    <span id="clock-time">17:25</span>
+    <canvas id="sun-dial" width="304" height="92" aria-hidden="true"></canvas>
+    <span class="tag" id="clock-note">Sunset 18:17</span>
+  </div>
+  <div class="hud-tc">
+    <canvas id="compass" width="1040" height="74" aria-hidden="true"></canvas>
+    <div id="objective"></div>
+    <div id="cells" aria-label="Batteries carried"><i></i><i></i><i></i></div>
+  </div>
+  <div class="hud-tr">
+    <span class="tag">Put down</span>
+    <span id="kills" style="font-family: var(--font-display); font-weight: 700; font-size: 1.7rem; line-height: 0.9">0</span>
+    <div id="pickups"></div>
+  </div>
+  <div class="hud-bl">
+    <div id="health"><span id="health-num">100</span><div><span class="tag">Health</span><div class="meter"><i id="health-fill"></i></div><div class="meter thin"><i id="stamina-fill"></i></div></div></div>
+  </div>
+  <div class="hud-br">
+    <div id="slots"><i data-slot="pistol">1</i><i data-slot="shotgun">2</i><i data-slot="rifle">3</i><i id="nades" class="own">G 2</i></div>
+    <span id="weapon-name">9 MM AUTO</span>
+    <div id="ammo"><span id="ammo-mag">13</span><span id="ammo-res">/ 52</span></div>
+  </div>
+  <div class="hud-bc">
+    <div id="subtitle" hidden></div>
+    <div id="prompt" hidden></div>
+    <div id="hold" hidden><i></i></div>
+  </div>
+  <div id="cross"><i></i><i></i><i></i><i></i><b></b></div>
+  <div id="hitmark"></div>
+  <div id="hurt"></div>
+  <div id="banner"><b></b><span></span></div>
+</div>
+
+<div id="touch" hidden>
+  <div data-stick><i></i></div>
+  <div class="tb fire" data-act="fire">FIRE</div>
+  <div class="tb aim" data-act="aim">AIM</div>
+  <div class="tb jump" data-act="jump">JUMP</div>
+  <div class="tb reload" data-act="reload">LOAD</div>
+  <div class="tb swap" data-act="swap">SWAP</div>
+  <div class="tb use" data-act="interact" hidden>USE</div>
+  <div class="tb light" data-act="light">LAMP</div>
+  <div class="tb nade" data-act="grenade">NADE</div>
+  <div class="tb pause" data-act="pause">II</div>
+</div>
+
+<div id="fade"></div>
+
+<section class="screen" id="loading">
+  <div class="panel">
+    <span class="eyebrow">Chandigarh &middot; 30.73&deg; N 76.78&deg; E</span>
+    <h1>City <span>Beautiful</span></h1>
+    <div class="bar"><i id="load-bar"></i></div>
+    <div id="load-label">Starting</div>
+  </div>
+</section>
+
+<section class="screen veil" id="title" hidden>
+  <div class="panel">
+    <span class="eyebrow">Capitol Complex &middot; 23 September 2087 &middot; the equinox</span>
+    <h1>City <span>Beautiful</span></h1>
+    <p class="lede">Sixty monsoons after the evacuation, the Capitol belongs to the banyans, and to the Bloom. Its hosts stand all day with their faces to the sun. At night they walk.</p>
+    <p class="lede">Three relief batteries were left behind when the city was sealed. Carry them to the Open Hand, light the beacon, and be alive when the sun comes back.</p>
+    <div class="row">
+      <button class="btn go" id="btn-start">Walk in</button>
+      <button class="btn quiet" id="btn-howto" aria-expanded="false" aria-controls="howto">Controls</button>
+      <button class="btn quiet" id="btn-settings" aria-expanded="false" aria-controls="settings">Settings</button>
+    </div>
+    <div class="sheet keys" id="howto" hidden>
+      <div class="only-keys"><kbd>W A S D</kbd><span>Move</span></div>
+      <div class="only-keys"><kbd>Mouse</kbd><span>Look, fire, hold right button to aim</span></div>
+      <div class="only-keys"><kbd>Shift</kbd><span>Run</span></div>
+      <div class="only-keys"><kbd>Space</kbd><span>Jump</span></div>
+      <div class="only-keys"><kbd>C</kbd><span>Crouch: quieter, steadier</span></div>
+      <div class="only-keys"><kbd>R</kbd><span>Reload</span></div>
+      <div class="only-keys"><kbd>1 2 3</kbd><span>Pistol, shotgun, rifle</span></div>
+      <div class="only-keys"><kbd>E</kbd><span>Pick up, use</span></div>
+      <div class="only-keys"><kbd>F</kbd><span>Torch</span></div>
+      <div class="only-keys"><kbd>V</kbd><span>Strike with the butt</span></div>
+      <div class="only-keys"><kbd>G</kbd><span>Throw a grenade</span></div>
+      <div class="only-keys"><kbd>Esc</kbd><span>Pause</span></div>
+      <div class="only-touch"><kbd>Left thumb</kbd><span>Move; push right up to run</span></div>
+      <div class="only-touch"><kbd>Right thumb</kbd><span>Look. The fire button aims as you hold it.</span></div>
+      <div><kbd>Head</kbd><span>One round to the head puts most of them down</span></div>
+      <div><kbd>Sun</kbd><span>By daylight they sleep standing. Noise and nearness wake them.</span></div>
+    </div>
+    <div class="sheet opts" id="settings" hidden>
+      <label for="set-quality">Detail</label>
+      <select id="set-quality"><option value="auto">Automatic</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select>
+      <label for="set-sens">Look speed</label><input type="range" id="set-sens" min="0.3" max="2.5" step="0.05">
+      <label for="set-fov">Field of view</label><input type="range" id="set-fov" min="60" max="95" step="1">
+      <label for="set-vol">Volume</label><input type="range" id="set-vol" min="0" max="1" step="0.02">
+      <label for="set-music">Score</label><input type="range" id="set-music" min="0" max="1" step="0.02">
+      <label for="set-invert">Invert look</label><input type="checkbox" id="set-invert">
+    </div>
+    <p class="fine" id="title-best"></p>
+    <p class="fine">The buildings follow Le Corbusier's Capitol Complex, drawn closer together than they stand. The sky is computed for the date and place: the Sun, the Moon and three hundred named stars are where they will be.</p>
+  </div>
+</section>
+
+<section class="screen full" id="pause" hidden>
+  <div class="panel">
+    <span class="eyebrow">Paused</span>
+    <h2>Hold your breath</h2>
+    <div class="row">
+      <button class="btn go" id="btn-resume">Go on</button>
+      <button class="btn" id="btn-restart">Start again</button>
+      <button class="btn quiet" id="btn-quit">Leave</button>
+    </div>
+    <div class="sheet opts" id="pause-settings"></div>
+  </div>
+</section>
+
+<section class="screen full" id="dead" hidden>
+  <div class="panel">
+    <span class="eyebrow" id="dead-when"></span>
+    <h2>The Bloom has you</h2>
+    <p class="lede" id="dead-line"></p>
+    <div class="stats" id="dead-stats"></div>
+    <div class="row"><button class="btn go" id="btn-retry">Walk in again</button><button class="btn quiet" id="btn-dead-quit">Leave</button></div>
+  </div>
+</section>
+
+<section class="screen full" id="won" hidden>
+  <div class="panel">
+    <span class="eyebrow">24 September 2087 &middot; 06:13 &middot; sunrise</span>
+    <h2>They turn to the light</h2>
+    <p class="lede">Every one of them stops where it stands and lifts its face to the east. Behind you the beacon is still burning, and from the hills comes the sound of rotors.</p>
+    <div class="stats" id="won-stats"></div>
+    <div class="row"><button class="btn go" id="btn-again">Walk in again</button><button class="btn quiet" id="btn-won-quit">Leave</button></div>
+  </div>
+</section>
+
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

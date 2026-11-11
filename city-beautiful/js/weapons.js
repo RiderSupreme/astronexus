@@ -9,31 +9,32 @@ import { SURF, SOLID } from './physics.js';
 import { clamp, damp, lerp, DEG, makeRng, TAU, smoothstep } from './util.js';
 
 export const ARMS = {
-  pistol: { name: '9 MM AUTO', mag: 13, reserve: 52, max: 130, dmg: 26, rpm: 400, auto: false, pellets: 1, spread: 0.45, spreadMove: 1.6, spreadAim: 0.1, kick: [1.5, 0.45], reload: 1.45, range: 110, zoom: 0.84, noise: 48, power: 0.8, hip: [0.15, -0.165, -0.4], aimZ: -0.3 },
-  shotgun: { name: '12-BORE PUMP', mag: 6, reserve: 12, max: 48, dmg: 15, rpm: 66, auto: false, pellets: 9, spread: 3.3, spreadMove: 4.2, spreadAim: 2.5, kick: [5.2, 1.2], reload: 0.52, byShell: true, range: 42, zoom: 0.88, noise: 65, power: 1.6, hip: [0.17, -0.2, -0.46], aimZ: -0.3 },
-  rifle: { name: '5.56 SERVICE RIFLE', mag: 30, reserve: 60, max: 240, dmg: 34, rpm: 640, auto: true, pellets: 1, spread: 0.3, spreadMove: 2.0, spreadAim: 0.05, kick: [0.85, 0.4], reload: 2.2, range: 190, zoom: 0.6, noise: 60, power: 1.1, hip: [0.17, -0.2, -0.44], aimZ: -0.22 },
+  pistol: { name: '9 MM AUTO', mag: 13, reserve: 52, max: 130, dmg: 26, rpm: 400, auto: false, pellets: 1, spread: 0.45, spreadMove: 1.6, spreadAim: 0.1, kick: [1.5, 0.45], reload: 1.45, range: 110, zoom: 0.84, noise: 48, power: 0.8, hip: [0.115, -0.125, -0.36], aimZ: -0.3 },
+  shotgun: { name: '12-BORE PUMP', mag: 6, reserve: 12, max: 48, dmg: 15, rpm: 66, auto: false, pellets: 9, spread: 3.3, spreadMove: 4.2, spreadAim: 2.5, kick: [5.2, 1.2], reload: 0.52, byShell: true, range: 42, zoom: 0.88, noise: 65, power: 1.6, hip: [0.13, -0.15, -0.37], aimZ: -0.3 },
+  rifle: { name: '5.56 SERVICE RIFLE', mag: 30, reserve: 60, max: 240, dmg: 34, rpm: 640, auto: true, pellets: 1, spread: 0.3, spreadMove: 2.0, spreadAim: 0.05, kick: [0.85, 0.4], reload: 2.2, range: 190, zoom: 0.6, noise: 60, power: 1.1, hip: [0.13, -0.15, -0.36], aimZ: -0.22 },
 };
 export const SLOTS = ['pistol', 'shotgun', 'rifle'];
 
 // ---- view models, assembled from boxes and tubes ----
 function mats() {
   const M = (color, metalness, roughness) => new THREE.MeshStandardMaterial({ color, metalness, roughness });
-  return { steel: M(0x25272a, 0.9, 0.4), worn: M(0x44464a, 0.9, 0.48), wood: M(0x4a2c17, 0, 0.55), poly: M(0x141518, 0.1, 0.7), glove: M(0x1b1814, 0, 0.85), sleeve: M(0x38402a, 0, 0.95), brass: M(0xb08a3a, 1, 0.3), red: M(0x7a1510, 0, 0.6) };
+  return { steel: M(0x25272a, 0.9, 0.4), worn: M(0x44464a, 0.9, 0.48), wood: M(0x4a2c17, 0, 0.55), poly: M(0x141518, 0.1, 0.7), glove: M(0x1b1814, 0, 0.85), sleeve: M(0x1f2419, 0, 0.95), brass: M(0xb08a3a, 1, 0.3), red: M(0x7a1510, 0, 0.6) };
 }
 function box(g, m, w, h, d, x, y, z, rx = 0, rz = 0) { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.rotation.set(rx, 0, rz); g.add(o); return o; }
 function tubeZ(g, m, r, len, x, y, z, r2 = r, sides = 12) { const o = new THREE.Mesh(new THREE.CylinderGeometry(r2, r, len, sides), m); o.rotation.x = Math.PI / 2; o.position.set(x, y, z); g.add(o); return o; }
 
-// A gloved hand on the end of a sleeve. The group's origin is the palm; the forearm runs back along `toElbow`.
-function hand(M, toElbow) {
-  const g = new THREE.Group();
-  box(g, M.glove, 0.085, 0.04, 0.1, 0, 0, 0);
-  box(g, M.glove, 0.03, 0.075, 0.09, -0.045, -0.02, 0);          // fingers curled round
-  box(g, M.glove, 0.03, 0.03, 0.07, 0.03, 0.03, -0.02);          // thumb
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.42, 10), M.sleeve);
-  const d = new THREE.Vector3(...toElbow).normalize();
-  arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), d); arm.position.copy(d).multiplyScalar(0.24);
-  g.add(arm);
-  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.05, 10), M.glove); cuff.quaternion.copy(arm.quaternion); cuff.position.copy(d).multiplyScalar(0.06); g.add(cuff);
+// A gloved hand on the end of a sleeve. The group's origin is the palm; `palmRot` turns the hand to its grip,
+// and the forearm runs off toward the elbow along `toElbow`, both given in the gun's own axes.
+function hand(M, toElbow, palmRot) {
+  const g = new THREE.Group(), palm = new THREE.Group();
+  palm.rotation.set(palmRot[0], palmRot[1], palmRot[2]); g.add(palm);
+  box(palm, M.glove, 0.08, 0.036, 0.095, 0, 0, 0);
+  box(palm, M.glove, 0.028, 0.07, 0.085, -0.042, -0.02, 0);         // fingers curled round
+  box(palm, M.glove, 0.028, 0.028, 0.065, 0.03, 0.028, -0.02);      // thumb
+  const d = new THREE.Vector3(...toElbow).normalize(), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), d);
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.047, 0.44, 10), M.sleeve);
+  arm.quaternion.copy(q); arm.position.copy(d).multiplyScalar(0.27); g.add(arm);
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.04, 0.05, 10), M.glove); cuff.quaternion.copy(q); cuff.position.copy(d).multiplyScalar(0.06); g.add(cuff);
   return g;
 }
 
@@ -51,8 +52,8 @@ function buildPistol(M) {
   p.mag = box(g, M.steel, 0.02, 0.1, 0.034, 0, -0.055, 0.047, 0.24);
   p.muzzle = new THREE.Object3D(); p.muzzle.position.set(0, 0.037, -0.14); g.add(p.muzzle);
   p.eject = new THREE.Object3D(); p.eject.position.set(0.018, 0.045, 0.0); g.add(p.eject);
-  p.right = hand(M, [0.25, -0.5, 0.75]); p.right.position.set(0.004, -0.055, 0.05); p.right.rotation.set(0.2, 0, -1.45); g.add(p.right);
-  p.left = hand(M, [-0.55, -0.45, 0.65]); p.left.position.set(-0.03, -0.085, 0.045); p.left.rotation.set(0.2, 0, 1.2); g.add(p.left);
+  p.right = hand(M, [0.2, -0.74, 0.62], [0.2, 0, -1.45]); p.right.position.set(0.004, -0.055, 0.05); g.add(p.right);
+  p.left = hand(M, [-0.46, -0.74, 0.5], [0.2, 0, 1.2]); p.left.position.set(-0.03, -0.085, 0.045); g.add(p.left);
   p.leftHome = p.left.position.clone();
   p.sight = 0.06;
   return { g, p };
@@ -74,8 +75,8 @@ function buildRifle(M) {
   p.bolt = box(g, M.worn, 0.012, 0.014, 0.05, 0.026, 0.02, 0.02);
   p.muzzle = new THREE.Object3D(); p.muzzle.position.set(0, 0.012, -0.58); g.add(p.muzzle);
   p.eject = new THREE.Object3D(); p.eject.position.set(0.03, 0.03, 0.01); g.add(p.eject);
-  p.right = hand(M, [0.3, -0.55, 0.7]); p.right.position.set(0.004, -0.075, 0.09); p.right.rotation.set(0.3, 0, -1.45); g.add(p.right);
-  p.left = hand(M, [-0.5, -0.5, 0.65]); p.left.position.set(-0.004, -0.03, -0.24); p.left.rotation.set(0, 0, 3.0); g.add(p.left);
+  p.right = hand(M, [0.24, -0.76, 0.6], [0.3, 0, -1.45]); p.right.position.set(0.004, -0.075, 0.09); g.add(p.right);
+  p.left = hand(M, [-0.38, -0.84, 0.38], [0, 0, 3.0]); p.left.position.set(-0.004, -0.035, -0.24); g.add(p.left);
   p.leftHome = p.left.position.clone();
   p.sight = 0.088;
   return { g, p };
@@ -93,8 +94,8 @@ function buildShotgun(M) {
   box(g, M.red, 0.02, 0.012, 0.05, 0.023, 0.005, 0.0);                                // a shell showing at the port
   p.muzzle = new THREE.Object3D(); p.muzzle.position.set(0, 0.016, -0.68); g.add(p.muzzle);
   p.eject = new THREE.Object3D(); p.eject.position.set(0.03, 0.01, 0.0); g.add(p.eject);
-  p.right = hand(M, [0.3, -0.55, 0.7]); p.right.position.set(0.004, -0.06, 0.1); p.right.rotation.set(0.35, 0, -1.45); g.add(p.right);
-  p.left = hand(M, [-0.5, -0.5, 0.65]); p.left.position.set(-0.004, -0.045, -0.27); p.left.rotation.set(0, 0, 3.0); p.pump.add(p.left);
+  p.right = hand(M, [0.24, -0.76, 0.6], [0.35, 0, -1.45]); p.right.position.set(0.004, -0.06, 0.1); g.add(p.right);
+  p.left = hand(M, [-0.38, -0.84, 0.38], [0, 0, 3.0]); p.left.position.set(-0.004, -0.05, -0.27); p.pump.add(p.left);
   p.leftHome = p.left.position.clone();
   p.sight = 0.034;
   return { g, p };

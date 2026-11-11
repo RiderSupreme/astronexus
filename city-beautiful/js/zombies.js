@@ -272,7 +272,7 @@ export class Horde {
     s.hunch = rng.range(0.18, 0.5); s.headRoll = rng.range(-0.3, 0.3); s.seed = rng.range(0, 100);
     s.phase = rng.range(0, TAU); s.move = 0; s.attackT = 0; s.cooldown = rng.range(0, 0.6); s.stagger = 0; s.slow = 0;
     s.deadT = 0; s.fall = 0; s.fallDir = 1; s.headless = false; s.wakeDelay = -1; s.sinceSeen = 0; s.groanT = rng.range(1, 7);
-    s.vx = 0; s.vz = 0; s.stuck = 0; s.sink = 0; s.hipY = 0; s.hipZ = 0; s.direct = false; s.struck = false;
+    s.vx = 0; s.vz = 0; s.stuck = 0; s.sink = 0; s.hipY = 0; s.hipZ = 0; s.direct = false; s.struck = false; s.pacified = false;
     s.flinch[0] = s.flinch[1] = s.flinch[2] = s.flinch[3] = 0;
     const V = this.variants[kind];
     s.mesh.geometry = V[rng.int(0, V.length - 1)];
@@ -288,7 +288,7 @@ export class Horde {
 
   // Noise at a point wakes the dormant within radius r (sooner the nearer they are).
   alert(x, z, r) {
-    for (const s of this.all) if (s.active && s.state === DORMANT && s.wakeDelay < 0) {
+    for (const s of this.all) if (s.active && s.state === DORMANT && s.wakeDelay < 0 && !s.pacified) {
       const d = Math.hypot(s.pos.x - x, s.pos.z - z);
       if (d < r) s.wakeDelay = 0.15 + d / r * 1.2 + this.rng.range(0, 0.5);
     }
@@ -321,7 +321,7 @@ export class Horde {
           s.move = 0;
           const wakeR = (sunUp ? 6.5 : 16) * (player.crouching ? 0.6 : 1) + player.noise * 14;
           if (s.wakeDelay >= 0) { s.wakeDelay -= dt; if (s.wakeDelay <= 0) this.wake(s); }
-          else if (player.alive && (dist < wakeR || this.awakeAll)) s.wakeDelay = this.awakeAll ? rng.range(0, 3.5) : rng.range(0.1, 0.5);
+          else if (!s.pacified && player.alive && (dist < wakeR || this.awakeAll)) s.wakeDelay = this.awakeAll ? rng.range(0, 3.5) : rng.range(0.1, 0.5);
           break;
         }
         case RISE: s.move = 0; if (s.stateT > 1.5) { s.state = CHASE; s.stateT = 0; } break;
@@ -334,11 +334,11 @@ export class Horde {
             wantYaw = Math.atan2(dx, dz);
             if (!s.struck && s.attackT > 0.5) {
               s.struck = true;
-              if (player.alive && dist < K.reach + 0.45 && Math.abs(py - s.pos.y) < 2.3) { player.hurt(K.damage, s.pos.x, s.pos.z); if (this.onHitPlayer) this.onHitPlayer(s); }
+              if (player.alive && dist < K.reach + 0.45 && Math.abs(py - s.pos.y) < 2.3 && this._reach(s, dx, py - s.pos.y, dz)) { player.hurt(K.damage, s.pos.x, s.pos.z); if (this.onHitPlayer) this.onHitPlayer(s); }
             }
             if (s.attackT >= 1) { s.state = CHASE; s.cooldown = kindCooldown(s.kind); s.stateT = 0; }
           } else if (player.alive) {
-            if (dist < K.reach && Math.abs(py - s.pos.y) < 2.3 && s.cooldown <= 0 && s.stagger <= 0) { s.state = ATTACK; s.attackT = 0; s.struck = false; this.game.audio?.infected('attack', s); }
+            if (dist < K.reach && Math.abs(py - s.pos.y) < 2.3 && s.cooldown <= 0 && s.stagger <= 0 && this._reach(s, dx, py - s.pos.y, dz)) { s.state = ATTACK; s.attackT = 0; s.struck = false; this.game.audio?.infected('attack', s); }
             else {
               // straight at the player when the way is open, otherwise down the gradient of the flow field
               if ((s.index + this.frame) % 6 === 0) s.direct = dist < 26 && nav.lineClear(s.pos.x, s.pos.z, px, pz);
@@ -393,6 +393,12 @@ export class Horde {
       this._place(s, dt);
       s.mesh.castShadow = dist < 55 && s.state !== DEAD;
     }
+  }
+
+  // Is there open air between this one's chest and the player's? No clawing through walls.
+  _reach(s, dx, dy, dz) {
+    const l = Math.hypot(dx, dy, dz);
+    return l < 0.5 || !this.world.solids.occluded(s.pos.x, s.pos.y + 1.2 * s.scale, s.pos.z, dx / l, dy / l, dz / l, l - 0.25, SOLID.MOVE);
   }
 
   _place(s, dt) {

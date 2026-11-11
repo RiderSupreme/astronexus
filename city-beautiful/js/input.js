@@ -50,22 +50,26 @@ export class Input {
     canvas.addEventListener('wheel', e => { if (this.enabled) { this.wheel += Math.sign(e.deltaY); e.preventDefault(); } }, { passive: false });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
+      if (this.locked) this.refusals = 0;
       if (this.onLockChange) this.onLockChange(this.locked);
     });
-    document.addEventListener('pointerlockerror', () => { this.lockFailed = true; });
+    document.addEventListener('pointerlockerror', () => this._lockRefused());
 
     if (touchRoot) this._initTouch(touchRoot);
   }
 
-  // Ask the browser to capture the mouse. Must be called from a click.
+  // Ask the browser to capture the mouse. Must be called from a click. Browsers refuse a request made
+  // within a second or so of Esc, so one refusal means nothing; several in a row with no success
+  // means this frame will never grant it, and the mouse is then read without capture.
   lock() {
-    if (this.touch) return;
+    if (this.touch || this.lockFailed) return;
     try {
-      const p = this.canvas.requestPointerLock && this.canvas.requestPointerLock();
-      if (p && p.catch) p.catch(() => { this.lockFailed = true; });
-      else if (!this.canvas.requestPointerLock) this.lockFailed = true;
-    } catch { this.lockFailed = true; }
+      if (!this.canvas.requestPointerLock) { this.lockFailed = true; return; }
+      const p = this.canvas.requestPointerLock();
+      if (p && p.catch) p.catch(() => this._lockRefused());
+    } catch { this._lockRefused(); }
   }
+  _lockRefused() { this.refusals = (this.refusals || 0) + 1; if (this.refusals >= 4) this.lockFailed = true; }
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
 
   // Movement as a 2D vector: keyboard gives unit steps, the touch stick gives its own values.

@@ -66,11 +66,12 @@ export class Nav {
   nearestWalkable(x, z, maxR = 8) {
     const i0 = Math.floor(x - this.x0), j0 = Math.floor(z - this.z0);
     let best = -1, bd = 1e9;
-    for (let r = 0; r <= maxR && best < 0; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
+    for (let r = 0; r <= maxR && (best < 0 || r <= 1); r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
       if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
       const i = i0 + di, j = j0 + dj; if (i < 0 || j < 0 || i >= this.w || j >= this.h) continue;
       const c = j * this.w + i; if (!this.walk[c]) continue;
-      const d = di * di + dj * dj; if (d < bd) { bd = d; best = c; }
+      // true distance from the point, not from its cell: otherwise a body against a thin wall is as likely to be sent through it as away from it
+      const ex = this.x0 + i + 0.5 - x, ez = this.z0 + j + 0.5 - z, d = ex * ex + ez * ez; if (d < bd) { bd = d; best = c; }
     }
     return best;
   }
